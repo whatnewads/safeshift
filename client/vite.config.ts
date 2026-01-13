@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -20,15 +21,15 @@ export default defineConfig(({ mode }) => {
     // Path aliases
     resolve: {
       alias: {
-        '@': '/src',
-        '@app': '/src/app',
-        '@components': '/src/app/components',
-        '@pages': '/src/app/pages',
-        '@hooks': '/src/app/hooks',
-        '@services': '/src/app/services',
-        '@contexts': '/src/app/contexts',
-        '@types': '/src/app/types',
-        '@utils': '/src/app/utils',
+        '@': path.resolve(__dirname, './src'),
+        '@app': path.resolve(__dirname, './src/app'),
+        '@components': path.resolve(__dirname, './src/app/components'),
+        '@pages': path.resolve(__dirname, './src/app/pages'),
+        '@hooks': path.resolve(__dirname, './src/app/hooks'),
+        '@services': path.resolve(__dirname, './src/app/services'),
+        '@contexts': path.resolve(__dirname, './src/app/contexts'),
+        '@types': path.resolve(__dirname, './src/app/types'),
+        '@utils': path.resolve(__dirname, './src/app/utils'),
       },
     },
     
@@ -75,7 +76,7 @@ export default defineConfig(({ mode }) => {
     
     // Build configuration
     build: {
-      outDir: 'dist', // Build to project root /dist
+      outDir: 'dist',
       emptyOutDir: true,
       sourcemap: true,
       rollupOptions: {
@@ -90,5 +91,10 @@ export default defineConfig(({ mode }) => {
     
     // Environment variable prefix
     envPrefix: 'VITE_',
+    
+    // Define process.env for compatibility
+    define: {
+      'process.env': process.env
+    },
   };
 });
