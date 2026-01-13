@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # PHP/Apache backend service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount server directory to container web root
+      - ./server:/var/www/html
+      # Mount logs directory
+      - ./server/logs:/var/www/html/logs
+      # Mount sessions directory for persistence
+      - ./server/sessions:/var/www/html/sessions
+      # Mount cache directory
+      - ./server/cache:/var/www/html/cache
+    environment:
+      - APP_ENV=production
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
+    depends_on:
+      - db
+    networks:
+      - safeshift
+
+  # Frontend development service (optional - for development with hot reload)
+  # Uncomment for development mode
+  # client:
+  #   image: node:20-alpine
+  #   working_dir: /app
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./client:/app
+  #     - /app/node_modules
+  #   command: npm run dev
+  #   environment:
+  #     - VITE_API_URL=http://localhost/api
+  #   networks:
+  #     - safeshift
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/database:/docker-entrypoint-initdb.d
+    networks:
+      - safeshift
+
+volumes:
+  mysql_data:
+
+networks:
+  safeshift:
+    driver: bridge

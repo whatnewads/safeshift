@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node modules (will be installed in container)
+client/node_modules/
+node_modules/
+
+# Build outputs (will be rebuilt in container)
+client/dist/
+client/build/
+
+# Test and coverage files
+coverage/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+server/tests/
+
+# Environment files (use docker-compose environment instead)
+.env
+.env.local
+.env.*.local
+
+# Logs (mounted as volume)
+server/logs/*.log
+*.log
+
+# Cache files
+server/cache/rate_limits/
+*.cache
+
+# Session files (mounted as volume)
+server/sessions/sess_*
+
+# Database backups
+server/database/backups/
+*.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Screenshots and assets not needed for build
+screenshots/
+
+# Guidelines and documentation
+guidelines/
+
+# Old configuration (replaced by docker/ directory)
+apache_vhost_fix.conf

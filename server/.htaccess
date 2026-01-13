@@ -1,0 +1,123 @@
+# SafeShift EHR - Apache Configuration
+# Supports React SPA + PHP API hybrid architecture
+
+# Enable rewrite engine
+RewriteEngine On
+RewriteBase /
+
+# ============================================
+# SECURITY: Block access to sensitive directories
+# ============================================
+# Block direct access to includes, model, ViewModel, core directories
+<FilesMatch "^(includes|model|ViewModel|core|database|cron)">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Block access to sensitive file types
+<FilesMatch "\.(env|sql|log|bak|git|htpasswd|htaccess)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes
+
+# ============================================
+# CORS HEADERS for React development server
+# ============================================
+<IfModule mod_headers.c>
+    # Allow React dev server (localhost:5173 for Vite)
+    SetEnvIf Origin "http://localhost:(5173|3000)" ORIGIN_OK=1
+    Header always set Access-Control-Allow-Origin "http://localhost:5173" env=ORIGIN_OK
+    Header always set Access-Control-Allow-Credentials "true" env=ORIGIN_OK
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS" env=ORIGIN_OK
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-CSRF-Token, X-Requested-With" env=ORIGIN_OK
+    
+    # Handle preflight requests
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
+
+# ============================================
+# SECURITY HEADERS
+# ============================================
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Uncomment for production with HTTPS:
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# ============================================
+# API ROUTING - Route /api/* to PHP backend
+# ============================================
+# Route all /api/v1/* requests to the v1 router
+RewriteCond %{REQUEST_URI} ^/api/v1/
+RewriteRule ^api/v1/(.*)$ api/v1/index.php [QSA,L]
+
+# Route legacy /api/* requests to api/index.php
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteCond %{REQUEST_URI} !^/api/v1/
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# ============================================
+# STATIC ASSETS - Serve directly
+# ============================================
+# Let Apache serve static files directly (images, fonts, etc.)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Serve React build assets (after npm run build)
+RewriteCond %{REQUEST_URI} ^/assets/
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# ============================================
+# SPA ROUTING - React handles all other routes
+# ============================================
+# For development: proxy to Vite dev server (configure in vite.config.ts)
+# For production: serve index.html for all non-file, non-api routes
+
+# If request is not a file and not a directory and not API
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule ^ index.html [L]
+
+# ============================================
+# PHP CONFIGURATION
+# ============================================
+<IfModule mod_php.c>
+    php_value session.cookie_httponly 1
+    php_value session.cookie_secure 0
+    php_value session.cookie_samesite "Lax"
+    php_value session.use_strict_mode 1
+    # Uncomment for production with HTTPS:
+    # php_value session.cookie_secure 1
+    # php_value session.cookie_samesite "Strict"
+</IfModule>
+
+# ============================================
+# COMPRESSION
+# ============================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css application/json application/javascript text/xml application/xml
+</IfModule>
+
+# ============================================
+# CACHING for static assets
+# ============================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>

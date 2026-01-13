@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PHPUnit Configuration for SafeShift EHR -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         verbose="true"
+         failOnRisky="true"
+         failOnWarning="true"
+         stopOnFailure="false"
+         stopOnError="false"
+         cacheDirectory=".phpunit.cache"
+         executionOrder="depends,defects"
+         beStrictAboutOutputDuringTests="true"
+         displayDetailsOnTestsThatTriggerWarnings="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true">
+    
+    <!-- Test Suites -->
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+        <testsuite name="API">
+            <directory>tests/API</directory>
+        </testsuite>
+        <testsuite name="Quality">
+            <directory>tests/Quality</directory>
+        </testsuite>
+    </testsuites>
+    
+    <!-- Code Coverage Configuration -->
+    <source>
+        <include>
+            <directory suffix=".php">model</directory>
+            <directory suffix=".php">ViewModel</directory>
+            <directory suffix=".php">core/Services</directory>
+            <directory suffix=".php">api</directory>
+        </include>
+        <exclude>
+            <directory>vendor</directory>
+            <directory>tests</directory>
+            <directory>node_modules</directory>
+            <file>model/.htaccess</file>
+            <file>ViewModel/.htaccess</file>
+        </exclude>
+    </source>
+    
+    <!-- Coverage Reports -->
+    <coverage>
+        <report>
+            <html outputDirectory="coverage/html"/>
+            <clover outputFile="coverage/clover.xml"/>
+            <text outputFile="coverage/coverage.txt"/>
+        </report>
+    </coverage>
+    
+    <!-- PHP Configuration -->
+    <php>
+        <!-- Environment Variables -->
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_DEBUG" value="true"/>
+        <env name="DB_NAME" value="safeshift_test"/>
+        <env name="DB_HOST" value="localhost"/>
+        <env name="DB_USER" value="root"/>
+        <env name="DB_PASS" value=""/>
+        <env name="SESSION_LIFETIME" value="3600"/>
+        <env name="AUDIT_SALT" value="test_audit_salt_for_testing_only"/>
+        
+        <!-- PHP INI Settings -->
+        <ini name="display_errors" value="1"/>
+        <ini name="error_reporting" value="-1"/>
+        <ini name="memory_limit" value="256M"/>
+        <ini name="date.timezone" value="UTC"/>
+    </php>
+    
+    <!-- Logging -->
+    <logging>
+        <junit outputFile="coverage/junit.xml"/>
+    </logging>
+    
+    <!-- Test Groups (for selective running) -->
+    <groups>
+        <exclude>
+            <group>slow</group>
+            <group>database</group>
+        </exclude>
+    </groups>
+</phpunit>

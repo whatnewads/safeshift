@@ -1,0 +1,22 @@
+# SafeShift EHR API v1 - Apache Configuration
+
+# Enable rewrite engine
+RewriteEngine On
+RewriteBase /api/v1/
+
+# Route all requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
+
+# Set JSON content type for all responses
+<IfModule mod_headers.c>
+    Header set Content-Type "application/json; charset=utf-8"
+</IfModule>
+
+# Block access to PHP files directly (except index.php)
+<FilesMatch "\.php$">
+    <If "%{REQUEST_URI} !~ m#/api/v1/index\.php$#">
+        Order Allow,Deny
+        Deny from all
+    </If>
+</FilesMatch>

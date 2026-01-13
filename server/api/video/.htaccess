@@ -1,0 +1,31 @@
+# Video Meeting API Security Configuration
+# 
+# Deny direct access to PHP files (route through main router if needed)
+# Allow only specific HTTP methods
+
+# Ensure PHP files are processed
+<IfModule mod_mime.c>
+    AddType application/x-httpd-php .php
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Deny access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Allow OPTIONS for CORS preflight
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Handle OPTIONS requests for CORS
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>

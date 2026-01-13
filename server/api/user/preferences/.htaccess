@@ -1,0 +1,31 @@
+# API User Preferences Directory Configuration
+# Enables PHP processing for API endpoints
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/user/preferences/
+
+    # Handle OPTIONS requests for CORS preflight
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+
+    # Ensure .php files are processed
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^([^\.]+)$ $1.php [NC,L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes
+
+# Restrict to PHP files only
+<FilesMatch "\.php$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
