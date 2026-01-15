@@ -475,7 +475,7 @@ export async function del<T = void>(
     timeout: config?.timeout,
     signal: config?.signal,
   });
-  return response.data;
+  return response.data as ApiResponse<T>;
 }
 
 // ============================================================================

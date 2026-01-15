@@ -231,8 +231,8 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
     success: rawData.valid === true,
     valid: rawData.valid,
     meeting,
-    error: rawData.error,
-    expiresAt: rawData.expires_at,
+    ...(rawData.error && { error: rawData.error }),
+    ...(rawData.expires_at && { expiresAt: rawData.expires_at }),
   };
 }
 

@@ -250,7 +250,7 @@ export async function createEncounter(data: CreateEncounterDTO): Promise<Encount
       throw new Error('Invalid API response: encounter data not found');
     }
     
-    const encounterId = encounter.id || (encounter as unknown as { encounter_id?: string }).encounter_id || null;
+    const encounterId = encounter.id || (encounter as any).encounter_id || null;
     
     logEhrSuccess(encounterId, 'CREATE_ENCOUNTER', {
       patientId: data.patientId,
@@ -525,7 +525,7 @@ export async function submitForReview(
     return {
       success: response.data.success ?? true,
       message: response.data.message ?? 'Encounter submitted for review',
-      encounter: response.data.encounter,
+      ...(response.data.encounter && { encounter: response.data.encounter }),
     };
   } catch (error: unknown) {
     // Handle API error response with validation errors
@@ -539,8 +539,8 @@ export async function submitForReview(
         return {
           success: false,
           message: axiosError.response.data.message || 'Validation failed',
-          errors: axiosError.response.data.errors,
-          code: axiosError.response.data.code,
+          ...(axiosError.response.data.errors && { errors: axiosError.response.data.errors }),
+          ...(axiosError.response.data.code && { code: axiosError.response.data.code }),
         };
       }
     }

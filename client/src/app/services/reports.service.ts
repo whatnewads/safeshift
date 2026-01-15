@@ -50,7 +50,7 @@ export async function generateReport(
   type: string,
   params?: Record<string, string | number | boolean | undefined>
 ): Promise<ApiResponse<ReportData>> {
-  return get<ReportData>(`/reports/${type}`, { params });
+  return get<ReportData>(`/reports/${type}`, params ? { params } : undefined);
 }
 
 /**
