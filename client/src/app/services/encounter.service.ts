@@ -240,7 +240,7 @@ export async function createEncounter(data: CreateEncounterDTO): Promise<Encount
     } else if ((response.data as any)?.data?.encounter) {
       // Nested structure: { data: { data: { encounter: {...} } } }
       encounter = (response.data as any).data.encounter;
-    } else if (response.data && ('id' in response.data || 'encounter_id' in response.data)) {
+    } else if (response.data && ('id' in (response.data as Record<string, unknown>) || 'encounter_id' in (response.data as Record<string, unknown>))) {
       // Response.data IS the encounter object itself
       encounter = response.data as unknown as Encounter;
     }
