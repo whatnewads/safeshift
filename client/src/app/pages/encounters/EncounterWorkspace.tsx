@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useOffline } from '../../hooks/useOffline.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -3775,7 +3775,7 @@ function SignaturesTab({
   providerSignature,
   setProviderSignature,
   witnessSignature,
-  setWitnessSignature,
+  setWitnessSignature: _setWitnessSignature,
   encounterId,
   isWorkRelated,
   onDisclosureChange,
@@ -3802,14 +3802,14 @@ function SignaturesTab({
   const [lastAutoSavedPatient, setLastAutoSavedPatient] = useState<string>('');
   const [lastAutoSavedParent, setLastAutoSavedParent] = useState<string>('');
   const [lastAutoSavedProvider, setLastAutoSavedProvider] = useState<string>('');
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [_autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   
   // Debounced auto-save for signature on click-out/blur
   const autoSaveSignature = useCallback((
     sigRef: React.RefObject<SignatureCanvas | null>,
     lastSaved: string,
     setLastSaved: (val: string) => void,
-    signatureType: 'patient' | 'parent' | 'provider'
+    _signatureType: 'patient' | 'parent' | 'provider'
   ) => {
     if (sigRef.current && !sigRef.current.isEmpty()) {
       const currentData = sigRef.current.toDataURL();
@@ -3861,8 +3861,8 @@ function SignaturesTab({
         title: 'Consent for Treatment Documentation',
         content: 'I acknowledge that the information provided is accurate to the best of my knowledge. I consent to this encounter being documented in SafeShift EHR.',
         version: '1.0',
-        is_active: true,
         requires_work_related: false,
+        display_order: 1,
       },
       {
         id: 2,
@@ -3870,8 +3870,8 @@ function SignaturesTab({
         title: 'Work-Related Authorization',
         content: 'If this incident is work-related, I authorize SafeShift to notify my employer\'s designated safety contacts with a summary of this incident as required by workplace safety protocols. This summary will not include detailed medical information.',
         version: '1.0',
-        is_active: true,
         requires_work_related: true,
+        display_order: 2,
       },
       {
         id: 3,
@@ -3879,8 +3879,8 @@ function SignaturesTab({
         title: 'HIPAA Privacy Notice Acknowledgment',
         content: 'I acknowledge that I have been provided the opportunity to review the Notice of Privacy Practices, which explains how my health information may be used and disclosed.',
         version: '1.0',
-        is_active: true,
         requires_work_related: false,
+        display_order: 3,
       }
     ];
   };
@@ -5550,202 +5550,6 @@ function VitalsEntryModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Encounter-Specific Sidebar Component
-function EncounterSidebar({
-  activeTab,
-  incidentForm,
-  patientForm,
-  disposition,
-  providerSignature,
-}: {
-  activeTab: string;
-  incidentForm: any;
-  patientForm: any;
-  disposition: string;
-  providerSignature: string;
-}) {
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  // Helper function to check if fields are filled
-  const isFieldFilled = (value: any) => {
-    return value !== '' && value !== null && value !== undefined;
-  };
-
-  // Define sections for each tab
-  const incidentSections = [
-    {
-      id: 'clinic-info',
-      label: 'Clinic Information',
-      requiredFields: [incidentForm.clinicName, incidentForm.clinicAddress],
-    },
-    {
-      id: 'time-fields',
-      label: 'Time-Based Fields',
-      requiredFields: [
-        incidentForm.mayDayTime,
-        incidentForm.patientContactTime,
-        incidentForm.transferOfCareTime,
-        incidentForm.clearedClinicTime,
-      ],
-    },
-    {
-      id: 'provider-info',
-      label: 'Provider Information',
-      requiredFields: [incidentForm.providerName, incidentForm.providerRole],
-    },
-    {
-      id: 'incident-details',
-      label: 'Incident Details',
-      requiredFields: [incidentForm.massCasualty, incidentForm.location, incidentForm.disposition],
-    },
-  ];
-
-  const patientSections = [
-    {
-      id: 'patient-demographics',
-      label: 'Patient Demographics',
-      requiredFields: [
-        patientForm.firstName,
-        patientForm.lastName,
-        patientForm.dob,
-        patientForm.sex,
-        patientForm.employeeId,
-        patientForm.ssn,
-        patientForm.dlNumber,
-        patientForm.dlState,
-        patientForm.phone,
-        patientForm.email,
-      ],
-    },
-    {
-      id: 'home-address',
-      label: 'Home Address',
-      requiredFields: [
-        patientForm.streetAddress,
-        patientForm.city,
-        patientForm.county,
-        patientForm.state,
-        patientForm.country,
-      ],
-    },
-    {
-      id: 'employment-info',
-      label: 'Employment Information',
-      requiredFields: [
-        patientForm.employer,
-        patientForm.supervisorName,
-        patientForm.supervisorPhone,
-      ],
-    },
-    {
-      id: 'medical-history',
-      label: 'Medical History',
-      requiredFields: [patientForm.medicalHistory, patientForm.allergies, patientForm.currentMedications],
-    },
-  ];
-
-  const assessmentsSections = [
-    { id: 'assessment-content', label: 'Body Region Assessment', requiredFields: [] },
-  ];
-
-  const vitalsSections = [{ id: 'vitals-table', label: 'Vitals Table', requiredFields: [] }];
-
-  const treatmentSections = [
-    { id: 'interventions', label: 'Interventions', requiredFields: [] },
-  ];
-
-  const narrativeSections = [
-    { id: 'clinical-narrative', label: 'Clinical Narrative', requiredFields: [] },
-  ];
-
-  const dispositionSections = [
-    {
-      id: 'disposition-outcome',
-      label: 'Disposition Outcome',
-      requiredFields: [disposition],
-    },
-  ];
-
-  const signaturesSections = [
-    {
-      id: 'provider-signature',
-      label: 'Provider Signature',
-      requiredFields: [providerSignature],
-    },
-    { id: 'witness-signature', label: 'Witness Signature (Optional)', requiredFields: [] },
-  ];
-
-  // Determine which sections to display based on active tab
-  let sections: any[] = [];
-  switch (activeTab) {
-    case 'incident':
-      sections = incidentSections;
-      break;
-    case 'patient':
-      sections = patientSections;
-      break;
-    case 'assessments':
-      sections = assessmentsSections;
-      break;
-    case 'vitals':
-      sections = vitalsSections;
-      break;
-    case 'treatment':
-      sections = treatmentSections;
-      break;
-    case 'narrative':
-      sections = narrativeSections;
-      break;
-    case 'disposition':
-      sections = dispositionSections;
-      break;
-    case 'signatures':
-      sections = signaturesSections;
-      break;
-  }
-
-  return (
-    <div className="w-80 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 p-6 overflow-auto">
-      <h3 className="mb-4 dark:text-white">Section Navigation</h3>
-      <div className="space-y-2">
-        {sections.map((section) => {
-          const filledFields = section.requiredFields.filter(isFieldFilled).length;
-          const totalFields = section.requiredFields.length;
-          const isComplete = totalFields > 0 && filledFields === totalFields;
-          const isPartial = totalFields > 0 && filledFields > 0 && filledFields < totalFields;
-          const isEmpty = totalFields > 0 && filledFields === 0;
-
-          return (
-            <button
-              key={section.id}
-              onClick={() => scrollToSection(section.id)}
-              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-between group"
-            >
-              <span className="text-sm">{section.label}</span>
-              <div className="flex items-center gap-2">
-                {totalFields > 0 && (
-                  <span className="text-xs text-slate-500">
-                    {filledFields}/{totalFields}
-                  </span>
-                )}
-                {isComplete && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                {isPartial && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
-                {isEmpty && <AlertCircle className="h-4 w-4 text-red-600" />}
-                {totalFields === 0 && <Circle className="h-4 w-4 text-slate-300" />}
-              </div>
-            </button>
-          );
-        })}
       </div>
     </div>
   );

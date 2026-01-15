@@ -7,7 +7,6 @@
 
 import {
   REQUIRED_FIELDS_BY_TAB,
-  calculateTabCompletion,
   type EncounterData,
   type TabRequiredFields,
   type RequiredField,

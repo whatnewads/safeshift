@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card.js';
 import { Button } from '../../components/ui/button.js';
 import { Input } from '../../components/ui/input.js';
-import { Search, User, UserPlus, FileText, Briefcase, HelpCircle, Loader2 } from 'lucide-react';
+import { Search, User, UserPlus, FileText, Briefcase, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { patientService } from '../../services/patient.service.js';
 import type { Patient } from '../../types/index.js';
@@ -35,11 +35,11 @@ export default function StartEncounterPage() {
   const [patientSearch, setPatientSearch] = useState('');
   const [encounterType, setEncounterType] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<PatientSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [_isSearching, setIsSearching] = useState(false);
+  const [_searchError, setSearchError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const handleStartEncounter = (patientId?: string) => {
+  const handleStartEncounter = (_patientId?: string) => {
     // Generate a new encounter ID
     const encounterId = `ENC-${Date.now()}`;
     toast.success('Starting encounter...');

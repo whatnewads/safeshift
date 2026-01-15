@@ -9,7 +9,7 @@
  * @copyright 2025 SafeShift EHR
  */
 
-import { get, post, put, del } from './api.js';
+import { get, post } from './api.js';
 import type {
   Meeting,
   Participant,

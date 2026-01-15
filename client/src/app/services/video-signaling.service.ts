@@ -188,7 +188,6 @@ export class VideoSignalingService {
     try {
       // Dynamic import of PeerJS
       // PeerJS must be installed: npm install peerjs
-      // @ts-expect-error - peerjs module loaded dynamically, install with: npm install peerjs
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const peerModule = await import('peerjs');
       this.PeerClass = peerModule.default || peerModule.Peer || peerModule;

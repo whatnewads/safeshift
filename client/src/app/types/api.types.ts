@@ -5,7 +5,7 @@
  * used throughout the React frontend to communicate with the PHP backend.
  */
 
-import type { User, Patient, Encounter } from './index.js';
+import type { User, Encounter } from './index.js';
 import type { UIRole, Permission } from '../utils/roleMapper.js';
 
 // ============================================================================

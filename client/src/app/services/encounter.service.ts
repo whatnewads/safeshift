@@ -250,7 +250,7 @@ export async function createEncounter(data: CreateEncounterDTO): Promise<Encount
       throw new Error('Invalid API response: encounter data not found');
     }
     
-    const encounterId = encounter.id || encounter.encounter_id;
+    const encounterId = encounter.id || (encounter as unknown as { encounter_id?: string }).encounter_id || null;
     
     logEhrSuccess(encounterId, 'CREATE_ENCOUNTER', {
       patientId: data.patientId,
