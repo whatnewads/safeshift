@@ -233,7 +233,7 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
     meeting,
     ...(rawData.error && { error: rawData.error }),
     ...(rawData.expires_at && { expiresAt: rawData.expires_at }),
-  };
+  } as ValidateTokenResponse;
 }
 
 /**

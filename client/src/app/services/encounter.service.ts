@@ -526,7 +526,7 @@ export async function submitForReview(
       success: response.data.success ?? true,
       message: response.data.message ?? 'Encounter submitted for review',
       ...(response.data.encounter && { encounter: response.data.encounter }),
-    };
+    } as SubmitForReviewResponse;
   } catch (error: unknown) {
     // Handle API error response with validation errors
     if (error && typeof error === 'object' && 'response' in error) {
@@ -541,7 +541,7 @@ export async function submitForReview(
           message: axiosError.response.data.message || 'Validation failed',
           ...(axiosError.response.data.errors && { errors: axiosError.response.data.errors }),
           ...(axiosError.response.data.code && { code: axiosError.response.data.code }),
-        };
+        } as SubmitForReviewResponse;
       }
     }
     // Re-throw for other types of errors
