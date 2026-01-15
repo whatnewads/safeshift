@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs.js';
 import { Skeleton } from '../../components/ui/skeleton.js';
-import { Progress } from '../../components/ui/progress.js';
 import {
   Table,
   TableBody,
@@ -45,7 +44,6 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  Clock,
   GraduationCap,
   ShieldAlert,
   AlertTriangle,
@@ -53,7 +51,6 @@ import {
   Star,
   Timer,
   TrendingUp,
-  Calendar,
 } from 'lucide-react';
 import { useSuperManager } from '../../hooks/useSuperManager.js';
 import type {

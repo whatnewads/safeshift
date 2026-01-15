@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Button } from '../../components/ui/button.js';
 import { Card } from '../../components/ui/card.js';
-import { Activity, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '../../components/ui/checkbox.js';
 import { Label } from '../../components/ui/label.js';

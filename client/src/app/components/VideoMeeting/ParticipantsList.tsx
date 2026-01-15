@@ -10,7 +10,7 @@
 import { useMemo } from 'react';
 import { Users, Mic, MicOff, Video, VideoOff, Circle } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area.js';
-import type { ParticipantsListProps, Participant, RemoteStream } from '../../types/video-meeting.types.js';
+import type { ParticipantsListProps, Participant } from '../../types/video-meeting.types.js';
 
 // ============================================================================
 // Participant Item Component

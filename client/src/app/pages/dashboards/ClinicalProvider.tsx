@@ -1,28 +1,23 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCallback } from 'react';
 import { Button } from '../../components/ui/button.js';
 import { Card } from '../../components/ui/card.js';
 import { Badge } from '../../components/ui/badge.js';
-import { Input } from '../../components/ui/input.js';
 import { Checkbox } from '../../components/ui/checkbox.js';
 import { useShift } from '../../contexts/ShiftContext.js';
 import { useSync } from '../../contexts/SyncContext.js';
 import { useClinicalProvider } from '../../hooks/useClinicalProvider.js';
-import type { RecentEncounter, ActiveEncounter, PendingOrder } from '../../hooks/useClinicalProvider.js';
+import type { RecentEncounter } from '../../hooks/useClinicalProvider.js';
 import { toast } from 'sonner';
 import {
   PlayCircle,
   TestTube,
   Wind,
-  Stethoscope,
   Clipboard,
   AlertCircle,
   FileText,
   User,
   UserPlus,
-  Search,
-  WifiOff,
-  Wifi,
   Clock,
   Eye,
   Info,
@@ -43,14 +38,12 @@ import {
 export default function ClinicalProviderDashboard() {
   const navigate = useNavigate();
   const { shiftData } = useShift();
-  const { syncStatus } = useSync();
+  const { } = useSync();
   
   // Use the clinical provider dashboard hook for API data
   const {
-    stats,
     activeEncounters,
     recentEncounters,
-    pendingOrders,
     loading,
     error,
     refetch,
@@ -94,18 +87,6 @@ export default function ClinicalProviderDashboard() {
       navigate('/encounters');
     }
   }, [activeEncounters, navigate]);
-
-  // Loading skeleton for stats
-  const StatsSkeleton = () => (
-    <div className="grid grid-cols-3 gap-4 mt-4">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-blue-500/30 rounded-lg p-3 animate-pulse">
-          <div className="h-8 bg-blue-400/30 rounded mb-2"></div>
-          <div className="h-4 bg-blue-400/30 rounded w-2/3"></div>
-        </div>
-      ))}
-    </div>
-  );
 
   // Loading skeleton for table rows
   const TableRowSkeleton = () => (

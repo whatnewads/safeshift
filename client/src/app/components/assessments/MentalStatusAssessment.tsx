@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AssessmentPanel, RadioGroup, CheckboxField } from './AssessmentPanel.js';
+import { AssessmentPanel, CheckboxField } from './AssessmentPanel.js';
 import { Label } from '../ui/label.js';
 import type { AssessmentStatus } from './AssessmentPanel.js';
 
@@ -134,7 +134,9 @@ export function MentalStatusAssessment() {
                   circle: isSelected ? 'border-red-600 dark:border-red-400 bg-red-600 dark:bg-red-500' : 'border-slate-800 dark:border-slate-200',
                   text: 'text-slate-900 dark:text-slate-100',
                 },
-              }[color];
+              }[color as 'green' | 'yellow' | 'orange' | 'red'];
+
+              if (!colorClasses) return null;
 
               return (
                 <button

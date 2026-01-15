@@ -1,6 +1,5 @@
-import { CheckCircle2, AlertTriangle, AlertCircle, Circle, ArrowLeft, Home } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Circle, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../ui/button.js';
 
 interface EncounterNavProps {
   encounterContext: any;

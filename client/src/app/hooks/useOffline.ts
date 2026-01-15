@@ -28,7 +28,7 @@ export function useOffline(): UseOfflineReturn {
         typeof navigator !== 'undefined' ? navigator.onLine : true
     );
     const [offlineCount, setOfflineCount] = useState<number>(0);
-    const [isSyncing, setIsSyncing] = useState<boolean>(false);
+    const [isSyncing, _setIsSyncing] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     
     // Track if component is mounted to prevent state updates after unmount

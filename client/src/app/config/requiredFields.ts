@@ -91,21 +91,6 @@ const hasMinimumAssessments = (assessments: any[]): boolean => {
   return assessments?.length >= 1;
 };
 
-const hasMinimumVitals = (vitals: any[]): boolean => {
-  if (!vitals || vitals.length === 0) return false;
-  // Check if at least one vitals set has required fields
-  return vitals.some(v => 
-    hasValue(v.time) &&
-    hasValue(v.date) &&
-    hasValue(v.avpu) &&
-    hasValue(v.bp) &&
-    hasValue(v.bpTaken) &&
-    hasValue(v.pulse) &&
-    hasValue(v.respiration) &&
-    hasValue(v.gcsTotal)
-  );
-};
-
 const hasMinimumNarrativeLength = (narrative: string | undefined): boolean => {
   return (narrative?.trim().length || 0) >= 25;
 };

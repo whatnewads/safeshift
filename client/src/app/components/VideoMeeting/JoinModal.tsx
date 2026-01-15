@@ -36,7 +36,7 @@ import type { JoinModalProps } from '../../types/video-meeting.types.js';
  */
 export function JoinModal({
   isOpen,
-  token,
+  token: _token,
   meeting,
   onJoin,
   onCancel,

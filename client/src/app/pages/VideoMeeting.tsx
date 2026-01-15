@@ -12,7 +12,6 @@ import {
   Video,
   Plus,
   Clock,
-  Users,
   Link,
   Copy,
   Check,
@@ -198,7 +197,7 @@ function MeetingCard({ meeting, onJoin, onShare, onEnd }: MeetingCardProps) {
  */
 export function VideoMeeting() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth(); // Ensures user is authenticated
 
   // State
   const [meetings, setMeetings] = useState<Meeting[]>([]);

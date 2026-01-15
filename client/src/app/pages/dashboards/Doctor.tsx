@@ -43,7 +43,6 @@ import { Textarea } from '../../components/ui/textarea.js';
 import { Label } from '../../components/ui/label.js';
 import {
   AlertCircle,
-  Clock,
   CheckCircle,
   FileSignature,
   ClipboardCheck,
@@ -567,7 +566,7 @@ function VerificationHistoryTable({
 function VerificationDialog({
   open,
   onOpenChange,
-  testId,
+  testId: _testId,
   patientName,
   testType,
   onSubmit,
@@ -690,7 +689,7 @@ function VerificationDialog({
 function SignOrderDialog({
   open,
   onOpenChange,
-  orderId,
+  orderId: _orderId,
   patientName,
   orderType,
   description,
@@ -835,7 +834,7 @@ export default function DoctorDashboard() {
   }, []);
 
   // Handle view details (placeholder for future implementation)
-  const handleViewDetails = useCallback((verification: PendingVerification) => {
+  const handleViewDetails = useCallback((_verification: PendingVerification) => {
     // TODO: Implement detailed view modal for verification
     // This would show test details, chain of custody info, lab results, etc.
   }, []);

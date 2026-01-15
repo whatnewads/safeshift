@@ -2,7 +2,6 @@ import { useMemo, useCallback } from 'react';
 import {
   REQUIRED_FIELDS_BY_TAB,
   getTabRequiredFields,
-  calculateTabCompletion,
   type EncounterData,
   type TabRequiredFields,
   type RequiredField,

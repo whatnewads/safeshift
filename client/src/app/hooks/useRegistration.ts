@@ -21,7 +21,6 @@ import type {
   QueueStats,
   PendingRegistration,
   PatientSearchResult,
-  RegistrationDashboardData,
 } from '../services/registration.service.js';
 
 // ============================================================================

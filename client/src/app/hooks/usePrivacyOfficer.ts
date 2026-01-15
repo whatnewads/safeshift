@@ -28,7 +28,6 @@ import type {
   TrainingStats,
   TrainingRecord,
   TrainingCompliance,
-  PrivacyOfficerDashboardData,
 } from '../services/privacy.service.js';
 
 // ============================================================================

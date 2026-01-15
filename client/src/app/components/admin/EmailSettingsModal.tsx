@@ -64,7 +64,7 @@ export default function EmailSettingsModal({ open, onOpenChange }: EmailSettings
   const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([]);
   const [loading, setLoading] = useState(false);
   const [recipientsLoading, setRecipientsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   // Add/Edit Email State
   const [isAddingEmail, setIsAddingEmail] = useState(false);

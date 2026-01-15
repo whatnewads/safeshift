@@ -26,11 +26,9 @@ import type {
   AuditEvent,
   FailedLogin,
   MFAStatus,
-  MFAUser,
   ActiveSession,
   SecurityAlert,
   UserDevice,
-  SecurityOfficerDashboardData,
 } from '../services/security.service.js';
 
 // ============================================================================

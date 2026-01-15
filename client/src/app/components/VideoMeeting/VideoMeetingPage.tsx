@@ -7,7 +7,7 @@
  * @package SafeShift\Components\VideoMeeting
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -45,7 +45,7 @@ import { WebRTCService } from '../../services/webrtc.service.js';
  */
 export function VideoMeetingPage() {
   const navigate = useNavigate();
-  const { meetingId } = useParams<{ meetingId: string }>();
+  const { meetingId: _meetingId } = useParams<{ meetingId: string }>();
   
   // Video meeting hook
   const {
@@ -58,14 +58,14 @@ export function VideoMeetingPage() {
     mediaState,
     meetingEnded,
     meetingStartTime,
-    connectionStatus,
+    connectionStatus: _connectionStatus,
     loading,
     error,
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
     leaveMeeting,
-    endMeeting,
+    endMeeting: _endMeeting,
     sendMessage,
     getMeetingLink,
     clearError,
@@ -96,13 +96,6 @@ export function VideoMeetingPage() {
     await leaveMeeting();
     navigate('/dashboard');
   }, [leaveMeeting, navigate]);
-
-  /**
-   * Handle end meeting (host only)
-   */
-  const handleEndMeeting = useCallback(async () => {
-    await endMeeting();
-  }, [endMeeting]);
 
   /**
    * Handle back to dashboard

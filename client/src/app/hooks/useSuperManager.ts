@@ -27,7 +27,6 @@ import {
 } from '../services/supermanager.service.js';
 import type {
   SuperManagerStats,
-  SuperManagerDashboardData,
   ClinicPerformance,
   ClinicComparison,
   StaffMember,

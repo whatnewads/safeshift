@@ -6,12 +6,11 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { 
+import {
   dashboardService,
   getErrorMessage,
   type ManagerStats,
   type Case,
-  type ManagerDashboardData,
   type ClinicalProviderStats,
   type TechnicianStats,
   type RegistrationStats,

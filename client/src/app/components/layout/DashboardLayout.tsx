@@ -6,7 +6,6 @@ import {
   LogOut,
   WifiOff,
   Wifi,
-  RefreshCw,
   Home,
   FileText,
   Users,
@@ -21,9 +20,6 @@ import {
   ChevronRight,
   CalendarClock,
   CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Circle,
   Moon,
   Sun,
   Plus,
@@ -67,7 +63,7 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout, switchRole } = useAuth();
   const { isSyncing, pendingCount, triggerSync } = useSync();
-  const { shiftData } = useShift();
+  const { shiftData: _shiftData } = useShift();
   const encounterContext = useEncounter();
   const activeEncounter = encounterContext?.activeEncounter || null;
   const { isDarkMode, toggleDarkMode } = useDarkMode();

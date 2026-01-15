@@ -3,7 +3,6 @@ import { Badge } from '../../components/ui/badge.js';
 import { Button } from '../../components/ui/button.js';
 import { Shield, FileText, CheckCircle, AlertCircle, Bot, RefreshCw, Loader2, XCircle, Inbox, Clock, Users, Activity } from 'lucide-react';
 import { usePrivacyOfficer } from '../../hooks/usePrivacyOfficer.js';
-import type { RegulatoryUpdate, ConsentStatus, AccessLog } from '../../hooks/usePrivacyOfficer.js';
 
 export default function PrivacyOfficerDashboard() {
   // Use the privacy officer dashboard hook for API data

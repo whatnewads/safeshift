@@ -16,7 +16,6 @@ import {
 import {
   Shield,
   Users,
-  Settings,
   Lock,
   Bot,
   Download,
@@ -68,7 +67,7 @@ export default function SuperAdminDashboard() {
   const { clinics: apiClinics, loading: clinicsLoading } = useClinics();
   const { stats: auditStats, loading: auditLoading } = useAuditLogs();
   const { incidents: apiIncidents, loading: incidentsLoading } = useSecurityIncidents();
-  const { requests: overrideRequests, loading: overridesLoading, approve: approveOverride, deny: denyOverride } = useOverrideRequests();
+  const { requests: overrideRequests, loading: overridesLoading } = useOverrideRequests();
 
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isForceCloseModalOpen, setIsForceCloseModalOpen] = useState(false);
@@ -124,16 +123,6 @@ export default function SuperAdminDashboard() {
     requestedBy: r.requestedBy,
     reason: r.reason || 'No reason provided',
   }));
-
-  // Helper function to format timestamp
-  const formatTimestamp = (timestamp: string | null) => {
-    if (!timestamp) return 'N/A';
-    try {
-      return new Date(timestamp).toLocaleString();
-    } catch {
-      return timestamp;
-    }
-  };
 
   return (
     <div className="p-6 space-y-6">

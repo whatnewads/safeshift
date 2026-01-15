@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
-import { 
-  Activity, 
-  ShieldCheck, 
-  Globe, 
+import {
+  Activity,
+  ShieldCheck,
   Zap,
   Users,
   FileText,

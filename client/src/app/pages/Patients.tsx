@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, ChangeEvent, MouseEvent } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShift } from '../contexts/ShiftContext.js';
 import { usePatients } from '../hooks/usePatients.js';
@@ -45,7 +45,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { PatientFilters } from '../types/api.types.js';
-import type { Patient } from '../types/index.js';
 
 // Extended patient type for display purposes
 interface DisplayPatient {
@@ -114,7 +113,7 @@ export default function PatientsPage() {
       id: patient.id,
       firstName: patient.firstName,
       lastName: patient.lastName,
-      employeeId: patient.employeeId || `EMP-${patient.id.slice(-4)}`,
+      employeeId: (patient as unknown as { employeeId?: string }).employeeId || `EMP-${patient.id.slice(-4)}`,
       employer: patient.employerName || 'Unknown Employer',
       lastVisit: patient.lastVisit || patient.createdAt,
       outcome: (patient as unknown as { outcome?: string }).outcome as DisplayPatient['outcome'] || 'pending',

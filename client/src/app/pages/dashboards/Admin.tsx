@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import * as React from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
@@ -7,23 +7,18 @@ import { Input } from '../../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
   useAdminDashboard,
-  useComplianceAlerts,
   useTrainingModules,
   useExpiringCredentials,
   useOsha300Log,
   useOsha300ASummary,
-  useClearanceStats,
 } from '../../hooks/useAdmin.js';
-import type { RecentCase, SitePerformance, ProviderPerformance } from '../../services/admin.service.js';
 import {
   AlertCircle,
   Clock,
   CheckCircle,
   FileText,
   Shield,
-  Bot,
   AlertTriangle,
-  Activity,
   Eye,
   GraduationCap,
   Users,
@@ -37,7 +32,6 @@ import {
   TrendingUp,
   Timer,
   Send,
-  Settings,
   Mail,
   Plus,
   ClipboardList,
@@ -120,9 +114,9 @@ export default function AdminDashboard() {
     loading: statsLoading
   } = useAdminDashboard();
   const { modules: apiTrainingModules, loading: trainingLoading } = useTrainingModules();
-  const { credentials: apiCredentials, loading: credentialsLoading } = useExpiringCredentials(60);
-  const { entries: osha300Entries, statistics: oshaStats, loading: oshaLoading } = useOsha300Log();
-  const { summary: osha300ASummary, loading: osha300ALoading } = useOsha300ASummary();
+  const { credentials: apiCredentials } = useExpiringCredentials(60);
+  const { } = useOsha300Log();
+  const { } = useOsha300ASummary();
 
   const [selectedClinic, setSelectedClinic] = useState<string>('all');
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
@@ -176,7 +170,7 @@ export default function AdminDashboard() {
     patient: c.patientName,
     type: c.chiefComplaint,
     status: c.status === 'in_progress' ? 'open' : c.status,
-    oshaStatus: c.oshaStatus || 'pending',
+    oshaStatus: 'pending', // Default since RecentCase doesn't have this property
     days: c.daysOpen || 0,
     provider: c.assignedProvider
   })) || [];
@@ -274,35 +268,24 @@ export default function AdminDashboard() {
     setComplianceNotifications(mockComplianceData);
   }, []);
 
-  const complianceAlerts = [
-    { id: '1', type: 'OSHA Update', title: 'Updated Recordkeeping Requirements', priority: 'high', date: '2 days ago', status: 'pending' },
-    { id: '2', type: 'DOT', title: 'Drug Testing Protocol Changes', priority: 'medium', date: '5 days ago', status: 'under-review' },
-  ];
-
-  const aiRecommendations = [
-    { id: '1', title: 'Update HIPAA training module based on new guidance', confidence: 95, status: 'pending', generatedDate: '12/18/2024' },
-    { id: '2', title: 'Revise data retention policy to align with state requirements', confidence: 87, status: 'pending', generatedDate: '12/17/2024' },
-    { id: '3', title: 'Add respirator fit test documentation to workflow', confidence: 92, status: 'approved', generatedDate: '12/15/2024' },
-  ];
-
   // Training Data - use API data if available
   const trainingModules = apiTrainingModules?.map(m => ({
     id: m.id,
     title: m.title,
-    assignedTo: m.assignedCount || 0,
-    completed: m.completedCount || 0,
-    inProgress: m.inProgressCount || 0,
-    notStarted: m.notStartedCount || 0,
+    assignedTo: m.assignedTo || 0,
+    completed: m.completed || 0,
+    inProgress: m.inProgress || 0,
+    notStarted: m.notStarted || 0,
     expiringCount: m.expiringCount || 0
   })) || [];
 
   // Expiring Credentials - use API data if available
   const expiringCredentials = apiCredentials?.map(c => ({
     id: c.id,
-    user: c.userName,
-    credential: c.credentialType,
-    license: c.licenseType || 'N/A',
-    shift: c.shift || 'Day',
+    user: c.user,
+    credential: c.credential,
+    license: 'N/A', // Not available in API type
+    shift: 'Day', // Not available in API type
     expiryDate: c.expiryDate ? new Date(c.expiryDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '',
     daysUntilExpiry: c.daysUntilExpiry,
     status: c.daysUntilExpiry <= 14 ? 'critical' : 'expiring-soon'
@@ -322,19 +305,11 @@ export default function AdminDashboard() {
     { id: '3', type: 'Failed Login Attempts', user: 'Unknown', severity: 'high', timestamp: '3:15 AM', details: '8 failed login attempts from 45.67.89.123' },
   ];
 
-  const handleApproveAIRecommendation = (id: string) => {
-    // TODO: Implement API call to approve AI recommendation
-  };
-
-  const handleRejectAIRecommendation = (id: 'string') => {
-    // TODO: Implement API call to reject AI recommendation
-  };
-
-  const handleMarkAuditReviewed = (id: string) => {
+  const handleMarkAuditReviewed = (_id: string) => {
     // TODO: Implement API call to mark audit log as reviewed
   };
 
-  const handleEscalateAnomaly = (id: string) => {
+  const handleEscalateAnomaly = (_id: string) => {
     // TODO: Implement API call to escalate anomaly to Super Admin
   };
 

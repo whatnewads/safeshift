@@ -17,9 +17,7 @@ import {
   MonitorOff,
   PhoneOff,
   Settings,
-  ChevronUp,
 } from 'lucide-react';
-import { Button } from '../ui/button.js';
 import {
   SimpleDropdown,
   SimpleDropdownItem,

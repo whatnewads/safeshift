@@ -26,7 +26,6 @@ import {
 } from '../services/doctor.service.js';
 import type {
   DoctorStats,
-  DoctorDashboardData,
   PendingVerification,
   PendingOrder,
   VerificationHistory,

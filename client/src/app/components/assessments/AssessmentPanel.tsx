@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Card } from '../ui/card.js';
 import { Label } from '../ui/label.js';
-import { User } from 'lucide-react';
 import { BodyModelModal } from './BodyModelModal.js';
 
 export type AssessmentStatus = 'normal' | 'abnormal' | 'not-assessed';
@@ -24,7 +23,7 @@ export function AssessmentPanel({
   onStatusChange,
   children,
   summary,
-  showBodyModel = false,
+  showBodyModel: _showBodyModel = false,
   onBodyFindings,
   bodyFindings = [],
 }: AssessmentPanelProps) {

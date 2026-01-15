@@ -10,7 +10,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getNotifications,
-  getUnreadCounts,
   markAsRead,
   markAsUnread,
   markAllAsRead,

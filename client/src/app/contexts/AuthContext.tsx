@@ -7,8 +7,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { authService } from '../services/auth.service.js';
-import { mapBackendRole, mapBackendRoles, getPrimaryUIRole, type UIRole } from '../utils/roleMapper.js';
-import type { LoginResponse, AuthResponse, SessionResponse } from '../types/api.types.js';
+import { mapBackendRole, mapBackendRoles, type UIRole } from '../utils/roleMapper.js';
+import type { LoginResponse, AuthResponse } from '../types/api.types.js';
 
 // ============================================================================
 // Type Definitions
@@ -210,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<AuthStage>('idle');
   const [sessionWarning, setSessionWarning] = useState(false);
-  const [pendingCredentials, setPendingCredentials] = useState<{
+  const [_pendingCredentials, setPendingCredentials] = useState<{
     username: string;
     password: string;
   } | null>(null);

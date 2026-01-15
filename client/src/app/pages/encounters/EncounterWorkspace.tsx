@@ -32,15 +32,6 @@ import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import { Card } from '../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
 import {
   Save,
   Send,
@@ -73,14 +64,13 @@ import {
   RotateCcw,
   Camera,
   MessageSquare,
-  Upload,
   Image,
   ChevronRight,
   ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SignatureCanvas from 'react-signature-canvas';
-import { sendSMSReminder, validatePhoneNumber, canSendSMS } from '../../services/sms.service.js';
+import { sendSMSReminder, validatePhoneNumber, canSendSMS as _canSendSMS } from '../../services/sms.service.js';
 import { uploadAppointmentDocument, validateFileType, validateFileSize, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '../../services/document.service.js';
 import {
   getDisclosureTemplates,
@@ -121,7 +111,7 @@ export default function EncounterWorkspacePage() {
   const location = useLocation();
   const encounterContext = useEncounter();
   const { shiftData: contextShiftData } = useShift(); // Get shift data from ShiftContext
-  const { isOnline, saveOffline, offlineCount, hasOfflineData } = useOffline();
+  const { isOnline, saveOffline, offlineCount } = useOffline();
   const [encounterStatus] = useState<'draft' | 'in-progress' | 'submitted'>('in-progress');
   const [autoSaving, setAutoSaving] = useState(false);
   const [assessmentSubTab, setAssessmentSubTab] = useState('traumatic');
@@ -129,17 +119,17 @@ export default function EncounterWorkspacePage() {
   // Validation state
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [_validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
   // Extract prefilled data from location state (moved before conditional)
   const prefilledData = location.state || {};
-  const { patientData, shiftData: navShiftData, incidentHistory, followUp } = prefilledData;
+  const { patientData, shiftData: navShiftData, incidentHistory: _incidentHistory, followUp } = prefilledData;
   
   // Use shift data from context first, fall back to navigation state for backwards compatibility
   const shiftData = contextShiftData || navShiftData;
 
   // Tab configuration with status
-  const [tabs, setTabs] = useState<TabData[]>([
+  const [tabs, _setTabs] = useState<TabData[]>([
     { id: 'incident', label: 'Incident', status: 'empty' },
     { id: 'patient', label: 'Patient', status: patientData ? 'partial' : 'empty' },
     { id: 'assessments', label: 'Assessments', status: 'empty' },
@@ -223,7 +213,7 @@ export default function EncounterWorkspacePage() {
     setProviderSignature,
     witnessSignature,
     setWitnessSignature,
-    setActiveEncounter,
+    setActiveEncounter: _setActiveEncounter,
     expectedFollowUpDate,
     setExpectedFollowUpDate,
     sendSms,
@@ -441,10 +431,10 @@ export default function EncounterWorkspacePage() {
             // SUBSEQUENT SAVE: Update existing encounter
             console.log('[EHR] [SAVE_DRAFT] Updating existing encounter on server:', serverEncounterId);
             
-            const updatedEncounter = await encounterService.updateEncounter(serverEncounterId, encounterPayload);
+            const updatedEncounter = await encounterService.updateEncounter(serverEncounterId, encounterPayload as any);
             
             console.log('[EHR] [SAVE_DRAFT] Encounter updated successfully:', {
-              encounterId: updatedEncounter.id || updatedEncounter.encounter_id,
+              encounterId: updatedEncounter.id || (updatedEncounter as any).encounter_id,
             });
             
             toast.success('Saved and synced to server');
@@ -452,10 +442,10 @@ export default function EncounterWorkspacePage() {
             // FIRST SAVE: Create new encounter
             console.log('[EHR] [SAVE_DRAFT] Creating new encounter on server');
             
-            const newEncounter = await encounterService.createEncounter(encounterPayload);
+            const newEncounter = await encounterService.createEncounter(encounterPayload as any);
             
             // Extract the server-generated ID
-            const newServerId = newEncounter.id || newEncounter.encounter_id;
+            const newServerId = newEncounter.id || (newEncounter as any).encounter_id;
             
             if (!newServerId) {
               throw new Error('Server did not return encounter ID');
@@ -706,8 +696,8 @@ export default function EncounterWorkspacePage() {
             },
           };
           
-          const newEncounter = await encounterService.createEncounter(createPayload);
-          submissionId = newEncounter.id || newEncounter.encounter_id;
+          const newEncounter = await encounterService.createEncounter(createPayload as any);
+          submissionId = newEncounter.id || (newEncounter as any).encounter_id;
           
           if (submissionId) {
             setServerEncounterId(submissionId);
@@ -732,7 +722,7 @@ export default function EncounterWorkspacePage() {
       if (submissionId) {
         console.log('[EHR] [SUBMIT] Calling submitForReview with ID:', submissionId);
         const { encounterService } = await import('../../services/encounter.service');
-        const response = await encounterService.submitForReview(submissionId, encounterData);
+        const response = await encounterService.submitForReview(submissionId, encounterData as any);
         
         // 8. Handle response
         if (response.success) {
@@ -774,6 +764,7 @@ export default function EncounterWorkspacePage() {
             // Convert server errors to our error format
             const serverErrors: ValidationError[] = Object.entries(response.errors).map(([field, message]) => ({
               field,
+              message: typeof message === 'string' ? message : String(message),
               label: typeof message === 'string' ? message : String(message),
               tabId: field.startsWith('incidentForm') ? 'incident' :
                      field.startsWith('patientForm') ? 'patient' :
@@ -782,6 +773,14 @@ export default function EncounterWorkspacePage() {
                      field === 'vitals' ? 'vitals' :
                      field === 'narrative' ? 'narrative' :
                      field === 'disclosures' ? 'signatures' : 'incident',
+              tabName: field.startsWith('incidentForm') ? 'Incident' :
+                       field.startsWith('patientForm') ? 'Patient' :
+                       field === 'providers' ? 'Incident' :
+                       field === 'assessments' ? 'Assessments' :
+                       field === 'vitals' ? 'Vitals' :
+                       field === 'narrative' ? 'Narrative' :
+                       field === 'disclosures' ? 'Signatures' : 'Incident',
+              sectionName: '',
               path: field,
             }));
             
@@ -1149,7 +1148,7 @@ export default function EncounterWorkspacePage() {
           <SidebarRequiredFields
             activeTab={activeTab}
             encounterData={encounterData}
-            onFieldClick={handleFieldClick}
+            onFieldClick={(fieldName) => handleFieldClick(fieldName, '')}
           />
         </div>
       </div>
@@ -1627,7 +1626,7 @@ function IncidentTab({
           </Button>
         </div>
         <div className="space-y-4">
-          {providers.map((provider, index) => (
+          {providers.map((provider, _index) => (
             <div key={provider.id} className="grid md:grid-cols-2 gap-6 p-4 border border-slate-200 rounded-lg relative">
               {providers.length > 1 && (
                 <Button
@@ -2075,8 +2074,8 @@ function PatientTab({
 
 // Assessments Tab Component
 function AssessmentsTab({
-  subTab,
-  setSubTab,
+  subTab: _subTab,
+  setSubTab: _setSubTab,
   patientForm,
   onAssessmentsChange,
 }: {
@@ -2215,7 +2214,7 @@ function AssessmentsTab({
   const updateAssessmentRegion = (id: string, region: string, value: string) => {
     setAssessments(
       assessments.map((a) =>
-        a.id === id ? { ...a, regions: { ...a.regions, [region]: value } } : a
+        a.id === id ? { ...a, regions: { ...(a as any).regions, [region]: value } } : a
       )
     );
   };
@@ -2281,7 +2280,7 @@ function AssessmentsTab({
                   <Clock className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                   <Input
                     type="text"
-                    value={assessment.editableTime || assessment.time}
+                    value={(assessment as any).editableTime || (assessment as any).time}
                     onChange={(e) => updateAssessmentTime(assessment.id, e.target.value)}
                     className="text-sm h-8 w-64"
                   />
@@ -2308,7 +2307,7 @@ function AssessmentsTab({
 
               {/* Body Regions Grid */}
               <div className="grid grid-cols-3 gap-3">
-                {Object.entries(assessment.regions).map(([key, value]) => (
+                {Object.entries((assessment as any).regions || {}).map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <Label className="text-xs">
                       {key
@@ -2393,10 +2392,10 @@ function AssessmentsTab({
 
 // Vitals Tab Component
 function VitalsTab({
-  vitalRows,
-  updateVitalRow,
-  addVitalRow,
-  removeVitalRow,
+  vitalRows: _vitalRows,
+  updateVitalRow: _updateVitalRow,
+  addVitalRow: _addVitalRow,
+  removeVitalRow: _removeVitalRow,
   onVitalsChange,
 }: {
   vitalRows: VitalRow[];
@@ -2535,10 +2534,10 @@ function VitalsTab({
                     <div className="text-sm">{vital.pulse}</div>
                   </div>
                 )}
-                {vital.respiration && (
+                {(vital as any).respiration && (
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Respiration</Label>
-                    <div className="text-sm">{vital.respiration}</div>
+                    <div className="text-sm">{(vital as any).respiration}</div>
                   </div>
                 )}
                 {vital.spo2 && (
@@ -2553,22 +2552,22 @@ function VitalsTab({
                     <div className="text-sm">{vital.temp}°F</div>
                   </div>
                 )}
-                {vital.glucose && (
+                {(vital as any).glucose && (
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Blood Glucose</Label>
-                    <div className="text-sm">{vital.glucose} mg/dL</div>
+                    <div className="text-sm">{(vital as any).glucose} mg/dL</div>
                   </div>
                 )}
-                {vital.pain && (
+                {(vital as any).pain && (
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Pain Scale</Label>
-                    <div className="text-sm">{vital.pain}/10</div>
+                    <div className="text-sm">{(vital as any).pain}/10</div>
                   </div>
                 )}
-                {vital.avpu && (
+                {(vital as any).avpu && (
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">AVPU</Label>
-                    <div className="text-sm">{vital.avpu}</div>
+                    <div className="text-sm">{(vital as any).avpu}</div>
                   </div>
                 )}
               </div>
@@ -2674,16 +2673,16 @@ function TreatmentTab() {
                   </Button>
                 </div>
                 <div>
-                  <h3 className="font-medium">{intervention.name}</h3>
-                  {intervention.category && (
+                  <h3 className="font-medium">{(intervention as any).name}</h3>
+                  {(intervention as any).category && (
                     <Badge variant="outline" className="mt-2">
-                      {intervention.category}
+                      {(intervention as any).category}
                     </Badge>
                   )}
                 </div>
-                {intervention.details && (
+                {(intervention as any).details && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    {Object.entries(intervention.details).map(([key, value]) => (
+                    {Object.entries((intervention as any).details).map(([key, value]) => (
                       <div key={key}>
                         <span className="text-slate-500">{key}: </span>
                         <span className="font-medium">{value as string}</span>
@@ -3772,9 +3771,9 @@ function DispositionTab({
 // TODO: LEGAL REVIEW REQUIRED - The disclosure text content should be reviewed
 // by legal counsel before production deployment.
 function SignaturesTab({
-  providerSignature,
-  setProviderSignature,
-  witnessSignature,
+  providerSignature: _providerSignature,
+  setProviderSignature: _setProviderSignature2,
+  witnessSignature: _witnessSignature,
   setWitnessSignature: _setWitnessSignature,
   encounterId,
   isWorkRelated,

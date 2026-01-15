@@ -14,7 +14,6 @@ import {
   WARNING_THRESHOLD_SECONDS,
   PING_INTERVAL_MS,
 } from '../types/session.types.js';
-import type { SessionState } from '../types/session.types.js';
 
 // ============================================================================
 // Configuration

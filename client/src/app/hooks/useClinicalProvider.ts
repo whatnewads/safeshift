@@ -24,7 +24,6 @@ import type {
   RecentEncounter,
   PendingOrder,
   QAReview,
-  ClinicalProviderDashboardData,
 } from '../services/clinicalprovider.service.js';
 
 // ============================================================================
