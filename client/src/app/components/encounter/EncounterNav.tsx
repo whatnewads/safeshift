@@ -103,15 +103,11 @@ export function EncounterNav({ encounterContext, sidebarOpen }: EncounterNavProp
     },
   ];
 
-  const assessmentsSections = [
-    { id: 'assessment-content', label: 'Assessment List', requiredFields: [] },
-  ];
-
-  const vitalsSections = [{ id: 'vitals-table', label: 'Vitals List', requiredFields: [] }];
-
-  const treatmentSections = [
-    { id: 'interventions', label: 'Interventions', requiredFields: [] },
-    { id: 'treatment-narrative', label: 'Narrative', requiredFields: [] },
+  // Consolidated Objective Findings sections (combines assessments, vitals, treatments)
+  const objectiveFindingsSections = [
+    { id: 'assessments-section', label: 'Assessments', requiredFields: [] },
+    { id: 'vitals-section', label: 'Vitals', requiredFields: [] },
+    { id: 'treatments-section', label: 'Treatments', requiredFields: [] },
   ];
 
   const narrativeSections = [
@@ -144,14 +140,8 @@ export function EncounterNav({ encounterContext, sidebarOpen }: EncounterNavProp
     case 'patient':
       sections = patientSections;
       break;
-    case 'assessments':
-      sections = assessmentsSections;
-      break;
-    case 'vitals':
-      sections = vitalsSections;
-      break;
-    case 'treatment':
-      sections = treatmentSections;
+    case 'objectiveFindings':
+      sections = objectiveFindingsSections;
       break;
     case 'narrative':
       sections = narrativeSections;

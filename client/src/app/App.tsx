@@ -25,6 +25,7 @@ import SuperAdminDashboard from './pages/dashboards/SuperAdmin.js';
 import StartEncounterPage from './pages/encounters/StartEncounter.js';
 import EncounterWorkspacePage from './pages/encounters/EncounterWorkspace.js';
 import PatientsPage from './pages/Patients.js';
+import PatientTimelinePage from './pages/PatientTimeline.js';
 import AssessmentsDemo from './pages/AssessmentsDemo.js';
 import SettingsPage from './pages/settings/Settings.js';
 import SubmitTicketPage from './pages/feedback/SubmitTicket.js';
@@ -199,6 +200,17 @@ export default function App() {
                         <ProtectedRoute>
                           <DashboardLayout>
                             <PatientsPage />
+                          </DashboardLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    
+                    <Route
+                      path="/patients/:patientId/timeline"
+                      element={
+                        <ProtectedRoute>
+                          <DashboardLayout>
+                            <PatientTimelinePage />
                           </DashboardLayout>
                         </ProtectedRoute>
                       }

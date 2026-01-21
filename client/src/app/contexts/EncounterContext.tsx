@@ -6,21 +6,51 @@ export interface VitalSet {
   time: string;
   bp: string;
   pulse: string;
-  resp: string;
+  resp?: string;
+  respiration?: string;
   spo2: string;
   temp: string;
-  painLevel: string;
-  gcs: string;
-  bloodGlucose: string;
+  painLevel?: string;
+  pain?: string;
+  gcs?: string;
+  bloodGlucose?: string;
+  glucose?: string;
   notes?: string;
+  // Extended fields from VitalsEntryModal
+  date?: string;
+  avpu?: string;
+  bpSystolic?: string;
+  bpDiastolic?: string;
+  bpMethod?: string;
+  pulseMethod?: string;
+  spo2NotAvailable?: boolean;
+  respirationQuality?: string;
+  tempMethod?: string;
+  gcsEye?: string;
+  gcsVerbal?: string;
+  gcsMotor?: string;
+  gcsTotal?: string;
 }
 
+// Assessment with regions object (used in UI)
+export interface AssessmentWithRegions {
+  id: string;
+  time?: string;
+  editableTime?: string;
+  regions: Record<string, string>;
+}
+
+// Legacy single-region assessment (for backwards compatibility)
 export interface Assessment {
   id: string;
   region: string;
   findings: string;
   notes?: string;
   timestamp: string;
+  // Extended fields to support regions object pattern
+  time?: string;
+  editableTime?: string;
+  regions?: Record<string, string>;
 }
 
 export interface Treatment {

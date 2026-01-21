@@ -1372,4 +1372,53 @@ class EncounterViewModel
             'createdBy' => $data['created_by'],
         ]);
     }
+
+    /**
+     * Get draft (in_progress) encounters for the current authenticated user
+     *
+     * Returns saved draft reports that the user can resume editing.
+     *
+     * @return array API response with draft encounters
+     */
+    public function getDrafts(): array
+    {
+        if (!$this->currentUserId) {
+            return ApiResponse::unauthorized('User not authenticated');
+        }
+
+        try {
+            // Get drafts from repository
+            $drafts = $this->encounterRepository->getDraftsByUser($this->currentUserId, 10);
+
+            // Format the response with patient display name logic
+            $formattedDrafts = array_map(function ($draft) {
+                // Use "New Patient" if patient_name is null or empty
+                $patientDisplayName = !empty($draft['patient_name']) && trim($draft['patient_name']) !== ''
+                    ? trim($draft['patient_name'])
+                    : 'New Patient';
+
+                return [
+                    'encounter_id' => $draft['encounter_id'],
+                    'patient_id' => $draft['patient_id'],
+                    'patient_display_name' => $patientDisplayName,
+                    'chief_complaint' => $draft['chief_complaint'],
+                    'encounter_type' => $draft['encounter_type'],
+                    'created_at' => $draft['created_at']
+                        ? (new DateTimeImmutable($draft['created_at']))->format('Y-m-d\TH:i:s\Z')
+                        : null,
+                    'modified_at' => $draft['modified_at']
+                        ? (new DateTimeImmutable($draft['modified_at']))->format('Y-m-d\TH:i:s\Z')
+                        : null,
+                ];
+            }, $drafts);
+
+            return ApiResponse::success([
+                'drafts' => $formattedDrafts,
+                'count' => count($formattedDrafts),
+            ]);
+        } catch (\Exception $e) {
+            error_log("EncounterViewModel::getDrafts error: " . $e->getMessage());
+            return ApiResponse::serverError('Failed to retrieve draft encounters', $e);
+        }
+    }
 }

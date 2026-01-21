@@ -11,6 +11,7 @@ import type {
   PatientFilters,
   CreatePatientDTO,
   UpdatePatientDTO,
+  PatientTimelineResponse,
 } from '../types/api.types.js';
 import type { Patient, Encounter } from '../types/index.js';
 
@@ -23,6 +24,7 @@ const PATIENT_ENDPOINTS = {
   byId: (id: string) => `/patients/${id}`,
   search: '/patients/search',
   encounters: (patientId: string) => `/patients/${patientId}/encounters`,
+  timeline: (patientId: string) => `/patients/${patientId}/timeline`,
 } as const;
 
 // ============================================================================
@@ -193,20 +195,38 @@ export async function searchPatients(query: string): Promise<Patient[]> {
 
 /**
  * Get all encounters for a specific patient
- * 
+ *
  * @param patientId - The patient's unique identifier
  * @returns Promise resolving to array of patient's encounters
- * 
+ *
  * @example
  * ```typescript
  * const encounters = await getPatientEncounters('pat-123');
- * const recentEncounters = encounters.filter(e => 
+ * const recentEncounters = encounters.filter(e =>
  *   new Date(e.createdAt) > oneWeekAgo
  * );
  * ```
  */
 export async function getPatientEncounters(patientId: string): Promise<Encounter[]> {
   const response = await get<Encounter[]>(PATIENT_ENDPOINTS.encounters(patientId));
+  return response.data;
+}
+
+/**
+ * Get patient timeline data including all encounters
+ *
+ * @param patientId - The patient's unique identifier
+ * @returns Promise resolving to the patient timeline data
+ * @throws ApiError if patient is not found
+ *
+ * @example
+ * ```typescript
+ * const timeline = await getPatientTimeline('pat-123');
+ * console.log(`Patient ${timeline.patient.name} has ${timeline.timeline.total_encounters} encounters`);
+ * ```
+ */
+export async function getPatientTimeline(patientId: string): Promise<PatientTimelineResponse> {
+  const response = await get<PatientTimelineResponse>(PATIENT_ENDPOINTS.timeline(patientId));
   return response.data;
 }
 
@@ -225,6 +245,7 @@ export const patientService = {
   deletePatient,
   searchPatients,
   getPatientEncounters,
+  getPatientTimeline,
 } as const;
 
 export default patientService;

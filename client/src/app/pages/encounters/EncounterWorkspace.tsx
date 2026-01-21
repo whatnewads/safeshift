@@ -1,8 +1,9 @@
 ﻿import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useOffline } from '../../hooks/useOffline.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useNarrative } from '../../hooks/useNarrative.js';
+import { VitalsEntryModal } from '../../components/vitals/VitalsEntryModal';
 import { MentalStatusAssessment } from '../../components/assessments/MentalStatusAssessment';
 import { NeurologicalAssessment } from '../../components/assessments/NeurologicalAssessment';
 import { SkinAssessment } from '../../components/assessments/SkinAssessment';
@@ -13,12 +14,14 @@ import { BackAssessment } from '../../components/assessments/BackAssessment';
 import { PelvisGUGIAssessment } from '../../components/assessments/PelvisGUGIAssessment';
 import { ExtremitiesAssessment } from '../../components/assessments/ExtremitiesAssessment';
 import { BodyModelModal } from '../../components/assessments/BodyModelModal';
+import { AssessmentModal } from '../../components/assessments/AssessmentModal';
 import { MobileEncounterNav } from '../../components/encounter/MobileEncounterNav';
 import { useEncounter } from '../../contexts/EncounterContext';
 import { useShift } from '../../contexts/ShiftContext';
 import { SidebarRequiredFields } from '../../components/encounter/SidebarRequiredFields';
 import { ValidationErrors } from '../../components/encounter/ValidationErrors.js';
 import { createEncounterData } from '../../hooks/useRequiredFields.js';
+import { ObjectiveFindingsTab } from '../../components/encounter/ObjectiveFindingsTab';
 import {
   validateEncounter,
   getFirstInvalidTab,
@@ -54,19 +57,13 @@ import {
   AlignLeft,
   FileCheck,
   PenTool,
-  Heart,
-  Droplet,
-  Wind,
-  Gauge,
-  Thermometer,
-  Brain,
-  Smile,
-  RotateCcw,
+  Stethoscope,
   Camera,
   MessageSquare,
   Image,
   ChevronRight,
   ChevronDown,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SignatureCanvas from 'react-signature-canvas';
@@ -109,12 +106,23 @@ export default function EncounterWorkspacePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const encounterContext = useEncounter();
+  
+  // Detect read-only mode from URL query parameter
+  const isReadOnly = searchParams.get('mode') === 'readonly';
   const { shiftData: contextShiftData } = useShift(); // Get shift data from ShiftContext
   const { isOnline, saveOffline, offlineCount } = useOffline();
   const [encounterStatus] = useState<'draft' | 'in-progress' | 'submitted'>('in-progress');
   const [autoSaving, setAutoSaving] = useState(false);
   const [assessmentSubTab, setAssessmentSubTab] = useState('traumatic');
+  
+  // Modal visibility state for ObjectiveFindingsTab
+  const [showOFVitalsModal, setShowOFVitalsModal] = useState(false);
+  const [showOFAssessmentModal, setShowOFAssessmentModal] = useState(false);
+  const [showOFTreatmentModal, setShowOFTreatmentModal] = useState(false);
+  const [editingOFVital, setEditingOFVital] = useState<any>(null);
+  const [editingOFAssessment, setEditingOFAssessment] = useState<any>(null);
   
   // Validation state
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
@@ -129,12 +137,11 @@ export default function EncounterWorkspacePage() {
   const shiftData = contextShiftData || navShiftData;
 
   // Tab configuration with status
+  // Note: assessments, vitals, treatment tabs have been combined into "objectiveFindings"
   const [tabs, _setTabs] = useState<TabData[]>([
     { id: 'incident', label: 'Incident', status: 'empty' },
     { id: 'patient', label: 'Patient', status: patientData ? 'partial' : 'empty' },
-    { id: 'assessments', label: 'Assessments', status: 'empty' },
-    { id: 'vitals', label: 'Vitals', status: 'empty' },
-    { id: 'treatment', label: 'Treatment', status: 'empty' },
+    { id: 'objectiveFindings', label: 'Objective Findings', status: 'empty' },
     { id: 'narrative', label: 'Narrative', status: 'empty' },
     { id: 'disposition', label: 'Disposition', status: 'empty' },
     { id: 'signatures', label: 'Signatures', status: 'empty' },
@@ -226,7 +233,7 @@ export default function EncounterWorkspacePage() {
 
   // Helper function to get the next tab in order
   const getNextTab = (currentTab: string): string | null => {
-    const tabOrder = ['incident', 'patient', 'assessments', 'vitals', 'treatment', 'narrative', 'disposition', 'signatures'];
+    const tabOrder = ['incident', 'patient', 'objectiveFindings', 'narrative', 'disposition', 'signatures'];
     const currentIndex = tabOrder.indexOf(currentTab);
     return currentIndex < tabOrder.length - 1 ? tabOrder[currentIndex + 1] : null;
   };
@@ -270,8 +277,9 @@ export default function EncounterWorkspacePage() {
       'incidentForm': 'incident',
       'patientForm': 'patient',
       'providers': 'incident',
-      'assessments': 'assessments',
-      'vitals': 'vitals',
+      'assessments': 'objectiveFindings',
+      'vitals': 'objectiveFindings',
+      'treatments': 'objectiveFindings',
       'narrative': 'narrative',
       'disposition': 'disposition',
       'disclosures': 'signatures',
@@ -769,15 +777,17 @@ export default function EncounterWorkspacePage() {
               tabId: field.startsWith('incidentForm') ? 'incident' :
                      field.startsWith('patientForm') ? 'patient' :
                      field === 'providers' ? 'incident' :
-                     field === 'assessments' ? 'assessments' :
-                     field === 'vitals' ? 'vitals' :
+                     field === 'assessments' ? 'objectiveFindings' :
+                     field === 'vitals' ? 'objectiveFindings' :
+                     field === 'treatments' ? 'objectiveFindings' :
                      field === 'narrative' ? 'narrative' :
                      field === 'disclosures' ? 'signatures' : 'incident',
               tabName: field.startsWith('incidentForm') ? 'Incident' :
                        field.startsWith('patientForm') ? 'Patient' :
                        field === 'providers' ? 'Incident' :
-                       field === 'assessments' ? 'Assessments' :
-                       field === 'vitals' ? 'Vitals' :
+                       field === 'assessments' ? 'Objective Findings' :
+                       field === 'vitals' ? 'Objective Findings' :
+                       field === 'treatments' ? 'Objective Findings' :
                        field === 'narrative' ? 'Narrative' :
                        field === 'disclosures' ? 'Signatures' : 'Incident',
               sectionName: '',
@@ -878,6 +888,8 @@ export default function EncounterWorkspacePage() {
         return <FileText className={iconClass} />;
       case 'patient':
         return <User className={iconClass} />;
+      case 'objectiveFindings':
+        return <Stethoscope className={iconClass} />;
       case 'assessments':
         return <ClipboardList className={iconClass} />;
       case 'vitals':
@@ -942,6 +954,20 @@ export default function EncounterWorkspacePage() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-900">
+      {/* Read-Only Banner */}
+      {isReadOnly && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <span className="text-blue-800 dark:text-blue-200 font-medium">Viewing Historical Report - Read Only</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Timeline
+          </Button>
+        </div>
+      )}
+      
       {/* Sticky Header */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm">
         {/* Top Header Bar */}
@@ -981,44 +1007,54 @@ export default function EncounterWorkspacePage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              {autoSaving && (
-                <span className="text-sm text-slate-500 flex items-center gap-1 hidden md:flex">
-                  <Clock className="h-3 w-3 animate-spin" />
-                  Saving...
-                </span>
-              )}
-              {/* Hide Validate button on mobile */}
-              <Button variant="outline" size="sm" onClick={handleValidate} className="hidden md:inline-flex">
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Validate
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSaveDraft}>
-                <Save className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Save</span>
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className={!isFormValid ? 'bg-amber-600 hover:bg-amber-700' : ''}
-                title={isFormValid ? 'Submit for review' : `Complete all required fields (${completionPercentage.toFixed(0)}% done)`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Clock className="h-4 w-4 md:mr-2 animate-spin" />
-                    <span className="hidden md:inline">Submitting...</span>
-                  </>
-                ) : (
-                  <>
-                    {!isFormValid && <AlertTriangle className="h-4 w-4 md:mr-2" />}
-                    {isFormValid && <Send className="h-4 w-4 md:mr-2" />}
-                    <span className="hidden md:inline">Submit {!isFormValid && `(${completionPercentage.toFixed(0)}%)`}</span>
-                  </>
+            {/* Action Buttons - Hidden in read-only mode */}
+            {!isReadOnly && (
+              <div className="flex items-center gap-2">
+                {autoSaving && (
+                  <span className="text-sm text-slate-500 flex items-center gap-1 hidden md:flex">
+                    <Clock className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </span>
                 )}
-              </Button>
-            </div>
+                {/* Hide Validate button on mobile */}
+                <Button variant="outline" size="sm" onClick={handleValidate} className="hidden md:inline-flex">
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Validate
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSaveDraft}>
+                  <Save className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Save</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className={!isFormValid ? 'bg-amber-600 hover:bg-amber-700' : ''}
+                  title={isFormValid ? 'Submit for review' : `Complete all required fields (${completionPercentage.toFixed(0)}% done)`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Clock className="h-4 w-4 md:mr-2 animate-spin" />
+                      <span className="hidden md:inline">Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      {!isFormValid && <AlertTriangle className="h-4 w-4 md:mr-2" />}
+                      {isFormValid && <Send className="h-4 w-4 md:mr-2" />}
+                      <span className="hidden md:inline">Submit {!isFormValid && `(${completionPercentage.toFixed(0)}%)`}</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Read-only indicator badge */}
+            {isReadOnly && (
+              <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
+                <Eye className="h-3 w-3 mr-1" />
+                Read Only
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -1059,13 +1095,79 @@ export default function EncounterWorkspacePage() {
                   setIncidentForm={setIncidentForm}
                   shiftData={shiftData}
                   onProvidersChange={setProviders}
+                  isReadOnly={isReadOnly}
                 />
                 <NextTabButton />
               </>
             )}
             {activeTab === 'patient' && (
               <>
-                <PatientTab patientForm={patientForm} setPatientForm={setPatientForm} />
+                <PatientTab patientForm={patientForm} setPatientForm={setPatientForm} isReadOnly={isReadOnly} />
+                <NextTabButton />
+              </>
+            )}
+            {activeTab === 'objectiveFindings' && (
+              <>
+                <ObjectiveFindingsTab
+                  isReadOnly={isReadOnly}
+                  onShowVitalsModal={() => {
+                    if (isReadOnly) return;
+                    setEditingOFVital(null);
+                    setShowOFVitalsModal(true);
+                  }}
+                  onEditVital={(vital) => {
+                    if (isReadOnly) return;
+                    setEditingOFVital(vital);
+                    setShowOFVitalsModal(true);
+                  }}
+                  onDeleteVital={(vitalId) => {
+                    if (isReadOnly) return;
+                    // Delete vital from context
+                    if (encounterContext?.setVitals) {
+                      const currentVitals = encounterContext.vitals ?? [];
+                      encounterContext.setVitals(currentVitals.filter((v) => v.id !== vitalId));
+                      toast.success('Vital record deleted');
+                    }
+                  }}
+                  onShowAssessmentModal={() => {
+                    if (isReadOnly) return;
+                    setEditingOFAssessment(null);
+                    setShowOFAssessmentModal(true);
+                  }}
+                  onEditAssessment={(assessment) => {
+                    if (isReadOnly) return;
+                    setEditingOFAssessment(assessment);
+                    setShowOFAssessmentModal(true);
+                  }}
+                  onDeleteAssessment={(assessmentId) => {
+                    if (isReadOnly) return;
+                    // Delete assessment from context
+                    if (encounterContext?.setAssessments) {
+                      const currentAssessments = encounterContext.assessments ?? [];
+                      encounterContext.setAssessments(currentAssessments.filter((a) => a.id !== assessmentId));
+                      toast.success('Assessment record deleted');
+                    }
+                  }}
+                  onShowTreatmentModal={() => {
+                    if (isReadOnly) return;
+                    setShowOFTreatmentModal(true);
+                  }}
+                  onEditTreatment={(_treatment) => {
+                    if (isReadOnly) return;
+                    // For treatments, we'll open the modal - edit functionality can be added later
+                    setShowOFTreatmentModal(true);
+                    toast.info('Edit treatment - select treatment to modify');
+                  }}
+                  onDeleteTreatment={(treatmentId) => {
+                    if (isReadOnly) return;
+                    // Delete treatment from context
+                    if (encounterContext?.setTreatments) {
+                      const currentTreatments = encounterContext.treatments ?? [];
+                      encounterContext.setTreatments(currentTreatments.filter((t) => t.id !== treatmentId));
+                      toast.success('Treatment record deleted');
+                    }
+                  }}
+                />
                 <NextTabButton />
               </>
             )}
@@ -1076,6 +1178,7 @@ export default function EncounterWorkspacePage() {
                   setSubTab={setAssessmentSubTab}
                   patientForm={patientForm}
                   onAssessmentsChange={setAssessments}
+                  isReadOnly={isReadOnly}
                 />
                 <NextTabButton />
               </>
@@ -1088,13 +1191,14 @@ export default function EncounterWorkspacePage() {
                   addVitalRow={addVitalRow}
                   removeVitalRow={removeVitalRow}
                   onVitalsChange={setVitalsData}
+                  isReadOnly={isReadOnly}
                 />
                 <NextTabButton />
               </>
             )}
             {activeTab === 'treatment' && (
               <>
-                <TreatmentTab />
+                <TreatmentTab isReadOnly={isReadOnly} />
                 <NextTabButton />
               </>
             )}
@@ -1104,6 +1208,7 @@ export default function EncounterWorkspacePage() {
                   narrativeText={narrativeText}
                   onNarrativeChange={setNarrativeText}
                   encounterId={serverEncounterId || id || ''}
+                  isReadOnly={isReadOnly}
                 />
                 <NextTabButton />
               </>
@@ -1125,6 +1230,7 @@ export default function EncounterWorkspacePage() {
                   patientId={patientForm.id}
                   encounterId={id || ''}
                   incidentForm={incidentForm}
+                  isReadOnly={isReadOnly}
                 />
                 <NextTabButton />
               </>
@@ -1138,6 +1244,7 @@ export default function EncounterWorkspacePage() {
                 encounterId={id || ''}
                 isWorkRelated={incidentForm.injuryClassification === 'work_related'}
                 onDisclosureChange={setDisclosureAcknowledgments}
+                isReadOnly={isReadOnly}
               />
             )}
           </div>
@@ -1149,6 +1256,7 @@ export default function EncounterWorkspacePage() {
             activeTab={activeTab}
             encounterData={encounterData}
             onFieldClick={(fieldName) => handleFieldClick(fieldName, '')}
+            onTabClick={(tabId) => setActiveTab(tabId)}
           />
         </div>
       </div>
@@ -1179,6 +1287,129 @@ export default function EncounterWorkspacePage() {
           onClose={() => setShowValidationModal(false)}
         />
       )}
+
+      {/* Objective Findings Tab Modals */}
+      {showOFVitalsModal && (
+        <VitalsEntryModal
+          isOpen={showOFVitalsModal}
+          onClose={() => {
+            setShowOFVitalsModal(false);
+            setEditingOFVital(null);
+          }}
+          onSave={(vitalData) => {
+            if (encounterContext?.setVitals) {
+              const currentVitals = encounterContext.vitals ?? [];
+              // Ensure vitalData has required id field for VitalSet compatibility
+              const vitalWithId = { ...vitalData, id: vitalData.id || Date.now().toString() };
+              if (editingOFVital) {
+                // Update existing vital
+                encounterContext.setVitals(
+                  currentVitals.map((v) =>
+                    v.id === editingOFVital.id ? { ...vitalWithId, id: editingOFVital.id } : v
+                  )
+                );
+                toast.success('Vitals updated');
+              } else {
+                // Add new vital
+                encounterContext.setVitals([vitalWithId, ...currentVitals]);
+                toast.success('Vitals saved');
+              }
+            }
+            setShowOFVitalsModal(false);
+            setEditingOFVital(null);
+          }}
+          initialData={editingOFVital}
+        />
+      )}
+
+      {showOFAssessmentModal && (
+        <AssessmentModal
+          isOpen={showOFAssessmentModal}
+          onClose={() => {
+            setShowOFAssessmentModal(false);
+            setEditingOFAssessment(null);
+          }}
+          encounterId={serverEncounterId || id || ''}
+          existingAssessments={
+            editingOFAssessment
+              ? Object.fromEntries(
+                  Object.entries(editingOFAssessment.regions || {}).map(([key, value]) => [
+                    key,
+                    {
+                      status: value === 'No Abnormalities' ? 'normal' : value === 'Assessed' ? 'abnormal' : 'not-assessed',
+                      notes: '',
+                      timestamp: new Date().toISOString(),
+                    },
+                  ])
+                )
+              : {}
+          }
+          onSave={(updatedAssessments) => {
+            if (encounterContext?.setAssessments && updatedAssessments) {
+              const currentAssessments = encounterContext.assessments ?? [];
+              
+              // Convert AssessmentModal format to standard assessment format
+              const newRegions = Object.fromEntries(
+                Object.entries(updatedAssessments).map(([region, data]) => [
+                  region,
+                  data.status === 'normal' ? 'No Abnormalities' :
+                  data.status === 'abnormal' ? 'Assessed' : 'Not Assessed'
+                ])
+              );
+              
+              if (editingOFAssessment) {
+                // Update existing assessment
+                encounterContext.setAssessments(
+                  currentAssessments.map((a) =>
+                    a.id === editingOFAssessment.id
+                      ? {
+                          ...a,
+                          regions: newRegions,
+                          time: new Date().toLocaleString(),
+                          // Ensure required Assessment fields are present
+                          region: a.region || 'general',
+                          findings: a.findings || '',
+                          timestamp: new Date().toISOString()
+                        }
+                      : a
+                  )
+                );
+                toast.success('Assessment updated');
+              } else {
+                // Add new assessment with all required fields
+                const newAssessment = {
+                  id: Date.now().toString(),
+                  region: 'general',
+                  findings: '',
+                  timestamp: new Date().toISOString(),
+                  time: new Date().toLocaleString(),
+                  editableTime: new Date().toLocaleString(),
+                  regions: newRegions,
+                };
+                encounterContext.setAssessments([newAssessment, ...currentAssessments]);
+                toast.success('Assessment saved');
+              }
+            }
+            setShowOFAssessmentModal(false);
+            setEditingOFAssessment(null);
+          }}
+        />
+      )}
+
+      {showOFTreatmentModal && (
+        <InterventionModal
+          isOpen={showOFTreatmentModal}
+          onClose={() => setShowOFTreatmentModal(false)}
+          onSave={(intervention) => {
+            if (encounterContext?.setTreatments) {
+              const currentTreatments = encounterContext.treatments ?? [];
+              encounterContext.setTreatments([intervention, ...currentTreatments]);
+              toast.success('Treatment saved');
+            }
+            setShowOFTreatmentModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1189,11 +1420,13 @@ function IncidentTab({
   setIncidentForm,
   shiftData,
   onProvidersChange,
+  isReadOnly = false,
 }: {
   incidentForm: any;
   setIncidentForm: any;
   shiftData?: any;
   onProvidersChange?: (providers: Array<{ id: string; name: string; role: string }>) => void;
+  isReadOnly?: boolean;
 }) {
   // Get logged-in user info for auto-fill
   const { user } = useAuth();
@@ -1325,6 +1558,8 @@ function IncidentTab({
                 setIncidentForm({ ...incidentForm, clinicName: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1335,6 +1570,8 @@ function IncidentTab({
               onChange={(e) =>
                 setIncidentForm({ ...incidentForm, clinicStreetAddress: e.target.value })
               }
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="grid md:grid-cols-2 gap-6">
@@ -1347,6 +1584,8 @@ function IncidentTab({
                   setIncidentForm({ ...incidentForm, clinicCity: e.target.value })
                 }
                 required
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -1358,6 +1597,8 @@ function IncidentTab({
                   setIncidentForm({ ...incidentForm, clinicState: e.target.value })
                 }
                 required
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
           </div>
@@ -1370,6 +1611,8 @@ function IncidentTab({
                 onChange={(e) =>
                   setIncidentForm({ ...incidentForm, clinicCounty: e.target.value })
                 }
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -1380,6 +1623,8 @@ function IncidentTab({
                 onChange={(e) =>
                   setIncidentForm({ ...incidentForm, clinicUnitNumber: e.target.value })
                 }
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
               <p className="text-xs text-slate-500">Suite, Apt, etc.</p>
             </div>
@@ -1401,6 +1646,8 @@ function IncidentTab({
                 onChange={(e) =>
                   setIncidentForm({ ...incidentForm, mayDayTime: e.target.value })
                 }
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -1413,6 +1660,8 @@ function IncidentTab({
                   setIncidentForm({ ...incidentForm, patientContactTime: e.target.value })
                 }
                 required
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -1424,6 +1673,8 @@ function IncidentTab({
                 onChange={(e) =>
                   setIncidentForm({ ...incidentForm, transferOfCareTime: e.target.value })
                 }
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -1436,6 +1687,8 @@ function IncidentTab({
                   setIncidentForm({ ...incidentForm, clearedClinicTime: e.target.value })
                 }
                 required
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
           </div>
@@ -1449,16 +1702,18 @@ function IncidentTab({
               <Button
                 type="button"
                 variant={incidentForm.massCasualty === 'yes' ? 'default' : 'outline'}
-                onClick={() => setIncidentForm({ ...incidentForm, massCasualty: 'yes' })}
-                className="flex-1"
+                onClick={() => !isReadOnly && setIncidentForm({ ...incidentForm, massCasualty: 'yes' })}
+                className={`flex-1 ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                disabled={isReadOnly}
               >
                 Yes
               </Button>
               <Button
                 type="button"
                 variant={incidentForm.massCasualty === 'no' ? 'default' : 'outline'}
-                onClick={() => setIncidentForm({ ...incidentForm, massCasualty: 'no' })}
-                className="flex-1"
+                onClick={() => !isReadOnly && setIncidentForm({ ...incidentForm, massCasualty: 'no' })}
+                className={`flex-1 ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                disabled={isReadOnly}
               >
                 No
               </Button>
@@ -1470,10 +1725,11 @@ function IncidentTab({
             <Select
               value={incidentForm.location}
               onValueChange={(value) =>
-                setIncidentForm({ ...incidentForm, location: value })
+                !isReadOnly && setIncidentForm({ ...incidentForm, location: value })
               }
+              disabled={isReadOnly}
             >
-              <SelectTrigger id="incidentLocation">
+              <SelectTrigger id="incidentLocation" className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                 <SelectValue placeholder="Select location..." />
               </SelectTrigger>
               <SelectContent>
@@ -1499,6 +1755,8 @@ function IncidentTab({
                   onChange={(e) =>
                     setIncidentForm({ ...incidentForm, injuryClassifiedByName: e.target.value })
                   }
+                  readOnly={isReadOnly}
+                  className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
                 />
               </div>
               <div className="col-span-4 space-y-2">
@@ -1506,10 +1764,11 @@ function IncidentTab({
                 <Select
                   value={incidentForm.injuryClassification || ''}
                   onValueChange={(value) =>
-                    setIncidentForm({ ...incidentForm, injuryClassification: value })
+                    !isReadOnly && setIncidentForm({ ...incidentForm, injuryClassification: value })
                   }
+                  disabled={isReadOnly}
                 >
-                  <SelectTrigger id="injuryClassification">
+                  <SelectTrigger id="injuryClassification" className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1526,10 +1785,11 @@ function IncidentTab({
             <Select
               value={incidentForm.natureOfIllness || ''}
               onValueChange={(value) =>
-                setIncidentForm({ ...incidentForm, natureOfIllness: value, natureOfIllnessOtherDetails: value !== 'other' ? '' : incidentForm.natureOfIllnessOtherDetails })
+                !isReadOnly && setIncidentForm({ ...incidentForm, natureOfIllness: value, natureOfIllnessOtherDetails: value !== 'other' ? '' : incidentForm.natureOfIllnessOtherDetails })
               }
+              disabled={isReadOnly}
             >
-              <SelectTrigger id="natureOfIllness" className="text-left">
+              <SelectTrigger id="natureOfIllness" className={`text-left ${isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Select NOI..." />
               </SelectTrigger>
               <SelectContent>
@@ -1558,6 +1818,8 @@ function IncidentTab({
                     setIncidentForm({ ...incidentForm, natureOfIllnessOtherDetails: e.target.value })
                   }
                   required
+                  readOnly={isReadOnly}
+                  className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
                 />
               </div>
             )}
@@ -1568,10 +1830,11 @@ function IncidentTab({
             <Select
               value={incidentForm.mechanismofinjury || ''}
               onValueChange={(value) =>
-                setIncidentForm({ ...incidentForm, mechanismofinjury: value, mechanismofinjuryOtherDetails: value !== 'other' ? '' : incidentForm.mechanismofinjuryOtherDetails })
+                !isReadOnly && setIncidentForm({ ...incidentForm, mechanismofinjury: value, mechanismofinjuryOtherDetails: value !== 'other' ? '' : incidentForm.mechanismofinjuryOtherDetails })
               }
+              disabled={isReadOnly}
             >
-              <SelectTrigger id="mechanismofinjury" className="text-left">
+              <SelectTrigger id="mechanismofinjury" className={`text-left ${isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder="Select MOI..." />
               </SelectTrigger>
               <SelectContent>
@@ -1605,6 +1868,8 @@ function IncidentTab({
                     setIncidentForm({ ...incidentForm, mechanismofinjuryOtherDetails: e.target.value })
                   }
                   required
+                  readOnly={isReadOnly}
+                  className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
                 />
               </div>
             )}
@@ -1615,20 +1880,22 @@ function IncidentTab({
       <Card className="p-6" id="provider-info">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg">Provider Information</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addProvider}
-            className="text-green-600 hover:text-green-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Provider
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addProvider}
+              className="text-green-600 hover:text-green-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Provider
+            </Button>
+          )}
         </div>
         <div className="space-y-4">
           {providers.map((provider, _index) => (
             <div key={provider.id} className="grid md:grid-cols-2 gap-6 p-4 border border-slate-200 rounded-lg relative">
-              {providers.length > 1 && (
+              {providers.length > 1 && !isReadOnly && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1642,10 +1909,10 @@ function IncidentTab({
                 <Label htmlFor={`provider-name-${provider.id}`}>Staff</Label>
                 <Select
                   value={provider.name}
-                  onValueChange={(value) => updateProvider(provider.id, 'name', value)}
-                  disabled={loadingStaff}
+                  onValueChange={(value) => !isReadOnly && updateProvider(provider.id, 'name', value)}
+                  disabled={loadingStaff || isReadOnly}
                 >
-                  <SelectTrigger id={`provider-name-${provider.id}`}>
+                  <SelectTrigger id={`provider-name-${provider.id}`} className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                     <SelectValue placeholder={loadingStaff ? "Loading staff..." : "Select staff member"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1676,9 +1943,10 @@ function IncidentTab({
                 <Label htmlFor={`provider-role-${provider.id}`}>Role</Label>
                 <Select
                   value={provider.role}
-                  onValueChange={(value) => updateProvider(provider.id, 'role', value)}
+                  onValueChange={(value) => !isReadOnly && updateProvider(provider.id, 'role', value)}
+                  disabled={isReadOnly}
                 >
-                  <SelectTrigger id={`provider-role-${provider.id}`}>
+                  <SelectTrigger id={`provider-role-${provider.id}`} className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1699,9 +1967,11 @@ function IncidentTab({
 function PatientTab({
   patientForm,
   setPatientForm,
+  isReadOnly = false,
 }: {
   patientForm: any;
   setPatientForm: any;
+  isReadOnly?: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -1711,13 +1981,15 @@ function PatientTab({
           <div className="space-y-2">
             <Label htmlFor="firstName">First Name <span className="text-red-600">*</span></Label>
             <Input
-              id="firstName"
-              value={patientForm.firstName}
-              onChange={(e) =>
-                setPatientForm({ ...patientForm, firstName: e.target.value })
-              }
-              required
-            />
+               id="firstName"
+               value={patientForm.firstName}
+               onChange={(e) =>
+                 setPatientForm({ ...patientForm, firstName: e.target.value })
+               }
+               required
+               readOnly={isReadOnly}
+               className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
+             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="lastName">Last Name <span className="text-red-600">*</span></Label>
@@ -1728,6 +2000,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, lastName: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1740,11 +2014,12 @@ function PatientTab({
                 onChange={(e) =>
                   setPatientForm({ ...patientForm, dob: e.target.value })
                 }
-                className="[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-3 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:filter-none"
+                className={`[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-3 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:filter-none ${isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}
                 style={{
                   colorScheme: 'light'
                 } as React.CSSProperties}
                 required
+                readOnly={isReadOnly}
               />
             </div>
           </div>
@@ -1752,9 +2027,10 @@ function PatientTab({
             <Label htmlFor="sex">Sex Assigned at Birth</Label>
             <Select
               value={patientForm.sex}
-              onValueChange={(value) => setPatientForm({ ...patientForm, sex: value })}
+              onValueChange={(value) => !isReadOnly && setPatientForm({ ...patientForm, sex: value })}
+              disabled={isReadOnly}
             >
-              <SelectTrigger id="sex">
+              <SelectTrigger id="sex" className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                 <SelectValue placeholder="Select sex" />
               </SelectTrigger>
               <SelectContent>
@@ -1772,6 +2048,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, employeeId: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1783,6 +2061,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, ssn: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">Format: XXX-XX-XXXX</p>
           </div>
@@ -1795,6 +2075,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, dlNumber: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1806,6 +2088,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, dlState: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">e.g., TX, CA, NY</p>
           </div>
@@ -1819,6 +2103,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, phone: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1831,6 +2117,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, email: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
         </div>
@@ -1848,6 +2136,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, streetAddress: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1859,6 +2149,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, city: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1870,6 +2162,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, county: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1881,6 +2175,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, state: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">e.g., TX, CA, NY</p>
           </div>
@@ -1893,6 +2189,8 @@ function PatientTab({
                 setPatientForm({ ...patientForm, country: e.target.value })
               }
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1903,6 +2201,8 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, unitNumber: e.target.value })
               }
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">Suite, Apt, etc.</p>
           </div>
@@ -1912,38 +2212,40 @@ function PatientTab({
       <Card className="p-6" id="employment-info">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg">Employment Information</h2>
-          <Button
-            type="button"
-            variant={patientForm.noEmploymentInfo ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              const isToggling = !patientForm.noEmploymentInfo;
-              if (isToggling) {
-                // Fill with N/A and disable fields
-                setPatientForm({
-                  ...patientForm,
-                  noEmploymentInfo: true,
-                  employer: 'N/A',
-                  supervisorName: 'N/A',
-                  supervisorPhone: 'N/A',
-                });
-                toast.info('Employment fields set to N/A');
-              } else {
-                // Re-enable fields and clear N/A values
-                setPatientForm({
-                  ...patientForm,
-                  noEmploymentInfo: false,
-                  employer: '',
-                  supervisorName: '',
-                  supervisorPhone: '',
-                });
-                toast.info('Employment fields re-enabled');
-              }
-            }}
-            className={patientForm.noEmploymentInfo ? 'bg-amber-600 hover:bg-amber-700' : ''}
-          >
-            {patientForm.noEmploymentInfo ? '✓ No Employment Info' : 'No Employment Info'}
-          </Button>
+          {!isReadOnly && (
+            <Button
+              type="button"
+              variant={patientForm.noEmploymentInfo ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                const isToggling = !patientForm.noEmploymentInfo;
+                if (isToggling) {
+                  // Fill with N/A and disable fields
+                  setPatientForm({
+                    ...patientForm,
+                    noEmploymentInfo: true,
+                    employer: 'N/A',
+                    supervisorName: 'N/A',
+                    supervisorPhone: 'N/A',
+                  });
+                  toast.info('Employment fields set to N/A');
+                } else {
+                  // Re-enable fields and clear N/A values
+                  setPatientForm({
+                    ...patientForm,
+                    noEmploymentInfo: false,
+                    employer: '',
+                    supervisorName: '',
+                    supervisorPhone: '',
+                  });
+                  toast.info('Employment fields re-enabled');
+                }
+              }}
+              className={patientForm.noEmploymentInfo ? 'bg-amber-600 hover:bg-amber-700' : ''}
+            >
+              {patientForm.noEmploymentInfo ? '✓ No Employment Info' : 'No Employment Info'}
+            </Button>
+          )}
         </div>
         <div className={`grid md:grid-cols-2 gap-6 ${patientForm.noEmploymentInfo ? 'opacity-50' : ''}`}>
           <div className="space-y-2">
@@ -1954,8 +2256,10 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, employer: e.target.value })
               }
-              disabled={patientForm.noEmploymentInfo}
+              disabled={patientForm.noEmploymentInfo || isReadOnly}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1966,8 +2270,10 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, supervisorName: e.target.value })
               }
-              disabled={patientForm.noEmploymentInfo}
+              disabled={patientForm.noEmploymentInfo || isReadOnly}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -1979,8 +2285,10 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, supervisorPhone: e.target.value })
               }
-              disabled={patientForm.noEmploymentInfo}
+              disabled={patientForm.noEmploymentInfo || isReadOnly}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
         </div>
@@ -1997,6 +2305,8 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, pcpName: e.target.value })
               }
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -2008,6 +2318,8 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, pcpPhone: e.target.value })
               }
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -2019,6 +2331,8 @@ function PatientTab({
               onChange={(e) =>
                 setPatientForm({ ...patientForm, pcpEmail: e.target.value })
               }
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
           </div>
         </div>
@@ -2037,6 +2351,8 @@ function PatientTab({
               }
               rows={4}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">Include relevant past conditions and surgeries</p>
           </div>
@@ -2050,6 +2366,8 @@ function PatientTab({
               }
               rows={4}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">Enter "None Known" if no allergies</p>
           </div>
@@ -2063,6 +2381,8 @@ function PatientTab({
               }
               rows={4}
               required
+              readOnly={isReadOnly}
+              className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
             />
             <p className="text-xs text-slate-500">Enter "None" if not taking any medications</p>
           </div>
@@ -2078,11 +2398,13 @@ function AssessmentsTab({
   setSubTab: _setSubTab,
   patientForm,
   onAssessmentsChange,
+  isReadOnly = false,
 }: {
   subTab: string;
   setSubTab: (value: string) => void;
   patientForm: any;
   onAssessmentsChange?: (assessments: any[]) => void;
+  isReadOnly?: boolean;
 }) {
   // Use context for persistent assessments data
   const encounterContext = useEncounter();
@@ -2354,16 +2676,39 @@ function AssessmentsTab({
         </div>
       </Card>
 
-      {/* Quick Assessment Dialog */}
+      {/* Assessment Modal with Tab-Based Navigation */}
       {showQuickAxDialog && currentAssessmentId && (
-        <QuickAssessmentDialog
+        <AssessmentModal
           isOpen={showQuickAxDialog}
           onClose={() => {
             setShowQuickAxDialog(false);
             setCurrentAssessmentId(null);
           }}
-          assessment={assessments.find((a) => a.id === currentAssessmentId)!}
-          onUpdate={(region, value) => updateAssessmentRegion(currentAssessmentId, region, value)}
+          encounterId={currentAssessmentId}
+          existingAssessments={
+            // Convert current assessment regions to AssessmentModal format
+            Object.fromEntries(
+              Object.entries(assessments.find((a) => a.id === currentAssessmentId)?.regions || {}).map(
+                ([key, value]) => [
+                  key,
+                  {
+                    status: value === 'No Abnormalities' ? 'normal' : value === 'Assessed' ? 'abnormal' : 'not-assessed',
+                    notes: '',
+                    timestamp: new Date().toISOString(),
+                  },
+                ]
+              )
+            )
+          }
+          onSave={(updatedAssessments) => {
+            // Convert AssessmentModal format back to the existing region format
+            if (!updatedAssessments) return;
+            Object.entries(updatedAssessments).forEach(([region, data]) => {
+              const value = data.status === 'normal' ? 'No Abnormalities' :
+                           data.status === 'abnormal' ? 'Assessed' : 'Not Assessed';
+              updateAssessmentRegion(currentAssessmentId, region, value);
+            });
+          }}
         />
       )}
 
@@ -2397,12 +2742,14 @@ function VitalsTab({
   addVitalRow: _addVitalRow,
   removeVitalRow: _removeVitalRow,
   onVitalsChange,
+  isReadOnly = false,
 }: {
   vitalRows: VitalRow[];
   updateVitalRow: (id: string, field: keyof VitalRow, value: string) => void;
   addVitalRow: () => void;
   removeVitalRow: (id: string) => void;
   onVitalsChange?: (vitals: any[]) => void;
+  isReadOnly?: boolean;
 }) {
   const [showVitalsModal, setShowVitalsModal] = useState(false);
   const [editingVital, setEditingVital] = useState<any>(null);
@@ -2599,7 +2946,7 @@ function VitalsTab({
 }
 
 // Treatment Tab Component
-function TreatmentTab() {
+function TreatmentTab({ isReadOnly = false }: { isReadOnly?: boolean }) {
   const [showInterventionModal, setShowInterventionModal] = useState(false);
   
   // Use context for persistent treatments/interventions data
@@ -3036,10 +3383,12 @@ function NarrativeTab({
   narrativeText,
   onNarrativeChange,
   encounterId,
+  isReadOnly = false,
 }: {
   narrativeText: string;
   onNarrativeChange: (value: string) => void;
   encounterId: string;
+  isReadOnly?: boolean;
 }) {
   // Use context for persistent narrative data
   const encounterContext = useEncounter();
@@ -3114,34 +3463,36 @@ function NarrativeTab({
     <Card className="p-6" id="clinical-narrative">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg">Clinical Narrative *</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleGenerateNarrative}
-            disabled={isGenerateDisabled}
-            title={!encounterId || encounterId === 'new'
-              ? 'Save encounter first to enable AI generation'
-              : isGenerating
-                ? 'Generating narrative...'
-                : 'Generate narrative using AI'}
-          >
-            {isGenerating ? (
-              <>
-                <Clock className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate with AI
-              </>
-            )}
-          </Button>
-          <Button size="sm" variant="outline">
-            Audit
-          </Button>
-        </div>
+        {!isReadOnly && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateNarrative}
+              disabled={isGenerateDisabled}
+              title={!encounterId || encounterId === 'new'
+                ? 'Save encounter first to enable AI generation'
+                : isGenerating
+                  ? 'Generating narrative...'
+                  : 'Generate narrative using AI'}
+            >
+              {isGenerating ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate with AI
+                </>
+              )}
+            </Button>
+            <Button size="sm" variant="outline">
+              Audit
+            </Button>
+          </div>
+        )}
       </div>
       
       {/* Error Banner */}
@@ -3166,8 +3517,9 @@ function NarrativeTab({
           rows={20}
           value={effectiveNarrative}
           onChange={(e) => handleNarrativeChange(e.target.value)}
-          className="resize-y min-h-[100px] max-h-[800px]"
+          className={`resize-y min-h-[100px] max-h-[800px] ${isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}`}
           disabled={isGenerating}
+          readOnly={isReadOnly}
           placeholder={isGenerating ? 'Generating narrative with AI...' : 'Enter clinical narrative...'}
         />
         <p className="text-xs text-slate-500">
@@ -3199,6 +3551,7 @@ function DispositionTab({
   patientId,
   encounterId,
   incidentForm,
+  isReadOnly = false,
 }: {
   disposition: string;
   setDisposition: (value: string) => void;
@@ -3214,6 +3567,7 @@ function DispositionTab({
   patientId: string;
   encounterId: string;
   incidentForm: any;
+  isReadOnly?: boolean;
 }) {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
@@ -3400,8 +3754,8 @@ function DispositionTab({
         <div className="space-y-6">
           <div className="space-y-2">
             <Label>Disposition Outcome</Label>
-            <Select value={disposition} onValueChange={setDisposition}>
-              <SelectTrigger>
+            <Select value={disposition} onValueChange={(v) => !isReadOnly && setDisposition(v)} disabled={isReadOnly}>
+              <SelectTrigger className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}>
                 <SelectValue placeholder="Select disposition..." />
               </SelectTrigger>
               <SelectContent>
@@ -3422,6 +3776,8 @@ function DispositionTab({
                 type="date"
                 value={expectedFollowUpDate}
                 onChange={(e) => setExpectedFollowUpDate(e.target.value)}
+                readOnly={isReadOnly}
+                className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
               />
             </div>
 
@@ -3431,8 +3787,9 @@ function DispositionTab({
                   id="sendSms"
                   type="checkbox"
                   checked={sendSms}
-                  onChange={(e) => setSendSms(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  onChange={(e) => !isReadOnly && setSendSms(e.target.checked)}
+                  disabled={isReadOnly}
+                  className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
                 />
                 Send SMS Reminder
               </Label>
@@ -3446,6 +3803,8 @@ function DispositionTab({
                   rows={6}
                   value={dispositionNotes}
                   onChange={(e) => setDispositionNotes(e.target.value)}
+                  readOnly={isReadOnly}
+                  className={isReadOnly ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
                 />
                 <p className="text-xs text-slate-500">Document follow-up instructions, restrictions, next steps, and any additional notes</p>
               </div>
@@ -3778,6 +4137,7 @@ function SignaturesTab({
   encounterId,
   isWorkRelated,
   onDisclosureChange,
+  isReadOnly = false,
 }: {
   providerSignature: string;
   setProviderSignature: (value: string) => void;
@@ -3786,6 +4146,7 @@ function SignaturesTab({
   encounterId: string;
   isWorkRelated: boolean;
   onDisclosureChange?: (acknowledgments: Record<string, boolean>) => void;
+  isReadOnly?: boolean;
 }) {
   const patientSigRef = useRef<SignatureCanvas | null>(null);
   const parentSigRef = useRef<SignatureCanvas | null>(null);
@@ -4367,8 +4728,8 @@ function AssessmentHistoryModal({
   );
 }
 
-// Quick Assessment Dialog Component
-function QuickAssessmentDialog({
+// Quick Assessment Dialog Component (exported for potential future use - replaced by AssessmentModal)
+export function QuickAssessmentDialog({
   isOpen,
   onClose,
   assessment,
@@ -4558,998 +4919,3 @@ function QuickAssessmentDialog({
   );
 }
 
-// Vitals Entry Modal Component
-function VitalsEntryModal({
-  isOpen,
-  onClose,
-  onSave,
-  initialData,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (vitalData: any) => void;
-  initialData?: any;
-}) {
-  const [activeCategory, setActiveCategory] = useState('bloodPressure');
-  const [showTimeTooltip, setShowTimeTooltip] = useState(false);
-  // Mobile sidebar collapse state
-  const [mobileSidebarCollapsed, setMobileSidebarCollapsed] = useState(true);
-  
-  // Default initial state for new vitals
-  const getDefaultVitalData = () => ({
-    id: Date.now().toString(),
-    time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-    date: new Date().toISOString().split('T')[0],
-    avpu: '',
-    side: '',
-    position: '',
-    bp: '',
-    bpTaken: '',
-    pulse: '',
-    pulseMethod: '',
-    pulseLocation: '',
-    pulseStrength: '',
-    pulseRhythm: '',
-    respiration: '',
-    respiratoryStatus: '',
-    spo2: '',
-    spo2NotAvailable: false,
-    etco2: '',
-    etco2NotAvailable: false,
-    temp: '',
-    tempNotAvailable: false,
-    tempLocation: '',
-    glucose: '',
-    glucoseNotAvailable: false,
-    pain: '',
-    painClarification: '',
-    gcsEye: '',
-    gcsVerbal: '',
-    gcsMotor: '',
-    gcsTotal: '',
-    ecgPerformed: '',
-    ecgRhythm: '',
-    ecgInterpretedBy: '',
-    ecgPhysicianName: '',
-  });
-  
-  // Use initialData if provided (edit mode), otherwise use defaults (add mode)
-  const [vitalData, setVitalData] = useState<any>(() =>
-    initialData ? { ...getDefaultVitalData(), ...initialData } : getDefaultVitalData()
-  );
-  
-  // Reset state when initialData changes (switching between add/edit)
-  useEffect(() => {
-    if (initialData) {
-      setVitalData({ ...getDefaultVitalData(), ...initialData });
-    } else {
-      setVitalData(getDefaultVitalData());
-    }
-  }, [initialData]);
-
-  // Auto-calculate GCS total
-  const calculateGCSTotal = () => {
-    const eye = parseInt(vitalData.gcsEye) || 0;
-    const verbal = parseInt(vitalData.gcsVerbal) || 0;
-    const motor = parseInt(vitalData.gcsMotor) || 0;
-    return eye + verbal + motor;
-  };
-
-  // Update GCS total whenever individual scores change
-  useEffect(() => {
-    if (vitalData.gcsEye || vitalData.gcsVerbal || vitalData.gcsMotor) {
-      const total = calculateGCSTotal();
-      if (vitalData.gcsTotal !== total.toString()) {
-        setVitalData((prev: any) => ({ ...prev, gcsTotal: total.toString() }));
-      }
-    }
-  }, [vitalData.gcsEye, vitalData.gcsVerbal, vitalData.gcsMotor]);
-
-  // Vitals validation ranges
-  const vitalsRanges = {
-    pulse: { low: 60, high: 100, unit: 'bpm', name: 'Heart Rate' },
-    systolic: { low: 90, high: 140, unit: 'mmHg', name: 'Systolic BP' },
-    diastolic: { low: 60, high: 90, unit: 'mmHg', name: 'Diastolic BP' },
-    respiration: { low: 12, high: 20, unit: 'breaths/min', name: 'Respiratory Rate' },
-    spo2: { low: 95, high: null, unit: '%', name: 'SpO2' },
-    temp: { low: 97.0, high: 99.5, unit: '°F', name: 'Temperature' },
-    gcs: { low: 15, high: null, unit: '', name: 'GCS' },
-  };
-
-  // Function to validate vitals and show warnings
-  const validateVitals = (data: any): string[] => {
-    const warnings: string[] = [];
-    
-    // Check Heart Rate/Pulse
-    if (data.pulse) {
-      const pulse = parseFloat(data.pulse);
-      const range = vitalsRanges.pulse;
-      if (!isNaN(pulse)) {
-        if (pulse < range.low) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${pulse} ${range.unit} is below normal range (${range.low}-${range.high})`);
-        } else if (pulse > range.high) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${pulse} ${range.unit} is above normal range (${range.low}-${range.high})`);
-        }
-      }
-    }
-    
-    // Check Blood Pressure
-    if (data.bp) {
-      const [systolicStr, diastolicStr] = data.bp.split('/');
-      const systolic = parseFloat(systolicStr);
-      const diastolic = parseFloat(diastolicStr);
-      
-      if (!isNaN(systolic)) {
-        const range = vitalsRanges.systolic;
-        if (systolic < range.low) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${systolic} ${range.unit} is below normal range (${range.low}-${range.high})`);
-        } else if (systolic > range.high) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${systolic} ${range.unit} is above normal range (${range.low}-${range.high})`);
-        }
-      }
-      
-      if (!isNaN(diastolic)) {
-        const range = vitalsRanges.diastolic;
-        if (diastolic < range.low) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${diastolic} ${range.unit} is below normal range (${range.low}-${range.high})`);
-        } else if (diastolic > range.high) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${diastolic} ${range.unit} is above normal range (${range.low}-${range.high})`);
-        }
-      }
-    }
-    
-    // Check Respiratory Rate
-    if (data.respiration) {
-      const rr = parseFloat(data.respiration);
-      const range = vitalsRanges.respiration;
-      if (!isNaN(rr)) {
-        if (rr < range.low) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${rr} ${range.unit} is below normal range (${range.low}-${range.high})`);
-        } else if (rr > range.high) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${rr} ${range.unit} is above normal range (${range.low}-${range.high})`);
-        }
-      }
-    }
-    
-    // Check SpO2 (only low alert)
-    if (data.spo2 && !data.spo2NotAvailable) {
-      const spo2 = parseFloat(data.spo2);
-      const range = vitalsRanges.spo2;
-      if (!isNaN(spo2) && spo2 < range.low) {
-        warnings.push(`⚠️ Warning: ${range.name} value ${spo2}${range.unit} is below normal range (≥${range.low})`);
-      }
-    }
-    
-    // Check Temperature
-    if (data.temp && !data.tempNotAvailable) {
-      const temp = parseFloat(data.temp);
-      const range = vitalsRanges.temp;
-      if (!isNaN(temp)) {
-        if (temp < range.low) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${temp}${range.unit} is below normal range (${range.low}-${range.high})`);
-        } else if (temp > range.high) {
-          warnings.push(`⚠️ Warning: ${range.name} value ${temp}${range.unit} is above normal range (${range.low}-${range.high})`);
-        }
-      }
-    }
-    
-    // Check GCS (only low alert, 15 is normal)
-    if (data.gcsTotal) {
-      const gcs = parseInt(data.gcsTotal);
-      const range = vitalsRanges.gcs;
-      if (!isNaN(gcs) && gcs < range.low) {
-        warnings.push(`⚠️ Warning: ${range.name} value ${gcs} is below normal (${range.low})`);
-      }
-    }
-    
-    return warnings;
-  };
-
-  if (!isOpen) return null;
-
-  const categories = [
-    { id: 'bloodPressure', label: 'Blood Pressure', icon: Droplet },
-    { id: 'pulse', label: 'Pulse', icon: Heart },
-    { id: 'respiration', label: 'Respiration', icon: Wind },
-    { id: 'spo2', label: 'SpO₂/EtCO₂', icon: Gauge },
-    { id: 'tempGlucose', label: 'Temp/Glucose', icon: Thermometer },
-    { id: 'scoring', label: 'GCS Scoring', icon: Brain },
-    { id: 'ecg', label: 'ECG', icon: Activity },
-    { id: 'painScales', label: 'Pain Scales', icon: Smile },
-  ];
-
-  const handleSave = () => {
-    // Validate vitals and show warnings for abnormal values
-    const warnings = validateVitals(vitalData);
-    
-    // Show toast warnings for each abnormal value (stacked)
-    warnings.forEach((warning, index) => {
-      setTimeout(() => {
-        toast.warning(warning, {
-          duration: 6000, // 6 seconds auto-dismiss
-          style: {
-            backgroundColor: '#fef3c7', // amber-100
-            border: '1px solid #f59e0b', // amber-500
-            color: '#92400e', // amber-800
-          },
-        });
-      }, index * 200); // Stagger the toasts slightly
-    });
-    
-    onSave(vitalData);
-  };
-
-  const setCurrentTimeAndDate = () => {
-    const now = new Date();
-    setVitalData({
-      ...vitalData,
-      time: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-      date: now.toISOString().split('T')[0],
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-6xl min-h-[85vh] max-h-[90vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-600">
-        {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl dark:text-white">Total 1 Vitals</h2>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Top Controls */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Label className="text-sm dark:text-slate-300">Time <span className="text-red-600">*</span></Label>
-              <div className="relative flex items-center gap-1">
-                <Input
-                  type="time"
-                  value={vitalData.time}
-                  onChange={(e) => setVitalData({ ...vitalData, time: e.target.value })}
-                  className="w-32"
-                />
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={setCurrentTimeAndDate}
-                    onMouseEnter={() => setShowTimeTooltip(true)}
-                    onMouseLeave={() => setShowTimeTooltip(false)}
-                    className="p-1 hover:bg-slate-100 rounded transition-colors"
-                  >
-                    <RotateCcw className="h-4 w-4 text-slate-600" />
-                  </button>
-                  {showTimeTooltip && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap z-50">
-                      Mark current time and date
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm dark:text-slate-300">Date <span className="text-red-600">*</span></Label>
-              <Input
-                type="date"
-                value={vitalData.date}
-                onChange={(e) => setVitalData({ ...vitalData, date: e.target.value })}
-                className="w-40 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:brightness-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm dark:text-slate-300">AVPU <span className="text-red-600">*</span></Label>
-              <Select
-                value={vitalData.avpu}
-                onValueChange={(value) => setVitalData({ ...vitalData, avpu: value })}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">Alert</SelectItem>
-                  <SelectItem value="V">Verbal</SelectItem>
-                  <SelectItem value="P">Pain</SelectItem>
-                  <SelectItem value="U">Unresponsive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm dark:text-slate-300">Side</Label>
-              <Select
-                value={vitalData.side}
-                onValueChange={(value) => setVitalData({ ...vitalData, side: value })}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm dark:text-slate-300">Position</Label>
-              <Select
-                value={vitalData.position}
-                onValueChange={(value) => setVitalData({ ...vitalData, position: value })}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sitting">Sitting</SelectItem>
-                  <SelectItem value="standing">Standing</SelectItem>
-                  <SelectItem value="lying">Lying</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="outline" size="sm">
-              UFO
-            </Button>
-            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 ml-auto">
-              OK
-            </Button>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Mobile Toggle Button for Sidebar - Only visible on mobile */}
-          <button
-            type="button"
-            onClick={() => setMobileSidebarCollapsed(!mobileSidebarCollapsed)}
-            className="md:hidden fixed bottom-4 left-4 z-50 p-3 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg"
-            aria-label={mobileSidebarCollapsed ? "Show categories" : "Hide categories"}
-          >
-            {mobileSidebarCollapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <ChevronDown className="h-5 w-5" />
-            )}
-          </button>
-          
-          {/* Left Sidebar - Categories - Dark mode fixed, collapsible on mobile */}
-          <div className={`
-            bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 overflow-y-auto
-            transition-all duration-300 ease-in-out
-            ${mobileSidebarCollapsed ? 'hidden md:block md:w-80' : 'w-full md:w-80'}
-          `}>
-            <div className="grid grid-cols-2">
-              {categories.map((cat) => {
-                const IconComponent = cat.icon;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setActiveCategory(cat.id);
-                      // Auto-collapse sidebar on mobile after selection
-                      if (window.innerWidth < 768) {
-                        setMobileSidebarCollapsed(true);
-                      }
-                    }}
-                    className={`p-4 text-left border-b border-r border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
-                      activeCategory === cat.id
-                        ? 'bg-green-100 dark:bg-green-900/30 border-b-4 border-b-green-600 text-green-800 dark:text-green-300'
-                        : 'text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    <IconComponent className={`h-6 w-6 mb-2 ${activeCategory === cat.id ? 'text-green-600 dark:text-green-400' : 'text-slate-700 dark:text-slate-300'}`} />
-                    <div className="text-sm">{cat.label}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right Content Area */}
-          <div className="flex-1 p-6 overflow-y-auto bg-white dark:bg-slate-800">
-            {activeCategory === 'bloodPressure' && (
-              <div className="space-y-4">
-                <h3 className="text-lg mb-4 dark:text-white">Blood Pressure <span className="text-red-600">*</span></h3>
-                <div className="max-w-md space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="dark:text-slate-300">Systolic <span className="text-red-600">*</span></Label>
-                      <Input
-                        type="number"
-                        placeholder="120"
-                        value={vitalData.bp?.split('/')[0] || ''}
-                        onChange={(e) => {
-                          const diastolic = vitalData.bp?.split('/')[1] || '';
-                          setVitalData({ ...vitalData, bp: `${e.target.value}/${diastolic}` });
-                        }}
-                        className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="dark:text-slate-300">Diastolic <span className="text-red-600">*</span></Label>
-                      <Input
-                        type="number"
-                        placeholder="80"
-                        value={vitalData.bp?.split('/')[1] || ''}
-                        onChange={(e) => {
-                          const systolic = vitalData.bp?.split('/')[0] || '';
-                          setVitalData({ ...vitalData, bp: `${systolic}/${e.target.value}` });
-                        }}
-                        className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">BP Method <span className="text-red-600">*</span></Label>
-                    <Select
-                      value={vitalData.bpTaken}
-                      onValueChange={(value) => setVitalData({ ...vitalData, bpTaken: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select method..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="automatic">Automatic</SelectItem>
-                        <SelectItem value="manual-auscultated">Manual Auscultated</SelectItem>
-                        <SelectItem value="palpated">Palpated</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'pulse' && (
-              <div className="space-y-4">
-                <h3 className="text-lg mb-4 dark:text-white">Pulse <span className="text-red-600">*</span></h3>
-                <div className="max-w-md space-y-4">
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Heart Rate (BPM) <span className="text-red-600">*</span></Label>
-                    <Input
-                      type="number"
-                      placeholder="72"
-                      value={vitalData.pulse}
-                      onChange={(e) => setVitalData({ ...vitalData, pulse: e.target.value })}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">How Pulse Was Taken</Label>
-                    <Select
-                      value={vitalData.pulseMethod}
-                      onValueChange={(value) => setVitalData({ ...vitalData, pulseMethod: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select method..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pulse-ox">Pulse Ox</SelectItem>
-                        <SelectItem value="cardiac-monitor">Cardiac Monitor</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {vitalData.pulseMethod === 'manual' && (
-                    <div className="space-y-2">
-                      <Label className="dark:text-slate-300">Where Pulse Was Taken</Label>
-                      <Select
-                        value={vitalData.pulseLocation}
-                        onValueChange={(value) => setVitalData({ ...vitalData, pulseLocation: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="radial">Radial</SelectItem>
-                          <SelectItem value="carotid">Carotid</SelectItem>
-                          <SelectItem value="femoral">Femoral</SelectItem>
-                          <SelectItem value="brachial">Brachial</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Pulse Strength</Label>
-                    <Select
-                      value={vitalData.pulseStrength}
-                      onValueChange={(value) => setVitalData({ ...vitalData, pulseStrength: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select strength..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="strong">Strong</SelectItem>
-                        <SelectItem value="thready">Thready</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Pulse Rhythm</Label>
-                    <Select
-                      value={vitalData.pulseRhythm}
-                      onValueChange={(value) => setVitalData({ ...vitalData, pulseRhythm: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select rhythm..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="regular">Regular</SelectItem>
-                        <SelectItem value="regularly-irregular">Regularly Irregular</SelectItem>
-                        <SelectItem value="irregularly-irregular">Irregularly Irregular</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'respiration' && (
-              <div className="space-y-4">
-                <h3 className="text-lg mb-4 dark:text-white">Respiration <span className="text-red-600">*</span></h3>
-                <div className="max-w-md space-y-4">
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Respiratory Rate (breaths/min) <span className="text-red-600">*</span></Label>
-                    <Input
-                      type="number"
-                      placeholder="16"
-                      value={vitalData.respiration}
-                      onChange={(e) => setVitalData({ ...vitalData, respiration: e.target.value })}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Respiratory Status</Label>
-                    <Select
-                      value={vitalData.respiratoryStatus}
-                      onValueChange={(value) => setVitalData({ ...vitalData, respiratoryStatus: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="shallow">Shallow</SelectItem>
-                        <SelectItem value="deep">Deep</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'spo2' && (
-              <div className="space-y-4">
-                <h3 className="text-lg mb-4 dark:text-white">SpO₂/EtCO₂/CO</h3>
-                <div className="max-w-md space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="dark:text-slate-300">SpO₂ (%)</Label>
-                      <Button
-                        type="button"
-                        variant={vitalData.spo2NotAvailable ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setVitalData({ ...vitalData, spo2NotAvailable: !vitalData.spo2NotAvailable, spo2: vitalData.spo2NotAvailable ? vitalData.spo2 : '' })}
-                      >
-                        Not Available
-                      </Button>
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="98"
-                      value={vitalData.spo2}
-                      onChange={(e) => setVitalData({ ...vitalData, spo2: e.target.value })}
-                      disabled={vitalData.spo2NotAvailable}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                  
-                  {/* Pulse from SpO2 auto-fill section - TASK 5.1 */}
-                  <div className="space-y-2 p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <Label className="dark:text-slate-300 font-medium">
-                        <Heart className="h-4 w-4 inline mr-1 text-green-600" />
-                        Pulse Reading (from SpO₂ Device)
-                      </Label>
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="Enter pulse displayed on pulse ox (e.g., 72)"
-                      value={vitalData.spo2Pulse || ''}
-                      onChange={(e) => {
-                        const newPulseValue = e.target.value;
-                        
-                        // ALWAYS auto-fill the Pulse field when user enters a value here
-                        // This is the primary use case: medic reads SpO2 device which shows both SpO2% and Pulse
-                        if (newPulseValue) {
-                          setVitalData({
-                            ...vitalData,
-                            spo2Pulse: newPulseValue,
-                            pulse: newPulseValue,  // Auto-fill the main pulse field
-                            pulseMethod: 'pulse-ox'  // Set the method to pulse-ox
-                          });
-                          
-                          // Show toast notification confirming auto-fill
-                          if (!vitalData.spo2Pulse) {
-                            toast.success(`Pulse auto-filled: ${newPulseValue} bpm (from SpO₂ device)`);
-                          }
-                        } else {
-                          // Clear value if user empties the field
-                          setVitalData({
-                            ...vitalData,
-                            spo2Pulse: newPulseValue,
-                            // Don't clear pulse if user clears this field - they may have manually adjusted it
-                          });
-                        }
-                      }}
-                      disabled={vitalData.spo2NotAvailable}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-lg font-medium"
-                    />
-                    <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      This value will auto-fill the Pulse field in the Pulse tab
-                    </p>
-                    {vitalData.spo2Pulse && vitalData.pulse === vitalData.spo2Pulse && (
-                      <div className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-2 py-1 rounded flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Pulse field synced: {vitalData.pulse} bpm
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="dark:text-slate-300">EtCO₂ (mmHg)</Label>
-                      <Button
-                        type="button"
-                        variant={vitalData.etco2NotAvailable ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setVitalData({ ...vitalData, etco2NotAvailable: !vitalData.etco2NotAvailable, etco2: vitalData.etco2NotAvailable ? vitalData.etco2 : '' })}
-                      >
-                        Not Available
-                      </Button>
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="35"
-                      value={vitalData.etco2}
-                      onChange={(e) => setVitalData({ ...vitalData, etco2: e.target.value })}
-                      disabled={vitalData.etco2NotAvailable}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'tempGlucose' && (
-              <div className="space-y-4">
-                <h3 className="text-lg mb-4 dark:text-white">Temperature / Glucose</h3>
-                <div className="max-w-md space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="dark:text-slate-300">Temperature (°F)</Label>
-                      <Button
-                        type="button"
-                        variant={vitalData.tempNotAvailable ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setVitalData({ ...vitalData, tempNotAvailable: !vitalData.tempNotAvailable, temp: vitalData.tempNotAvailable ? vitalData.temp : '' })}
-                      >
-                        Not Available
-                      </Button>
-                    </div>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder="98.6"
-                      value={vitalData.temp}
-                      onChange={(e) => setVitalData({ ...vitalData, temp: e.target.value })}
-                      disabled={vitalData.tempNotAvailable}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">Temp Location</Label>
-                    <Select
-                      value={vitalData.tempLocation}
-                      onValueChange={(value) => setVitalData({ ...vitalData, tempLocation: value })}
-                      disabled={vitalData.tempNotAvailable}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select location..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="temporal">Temporal</SelectItem>
-                        <SelectItem value="oral">Oral</SelectItem>
-                        <SelectItem value="aux">Auxiliary</SelectItem>
-                        <SelectItem value="rectal">Rectal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="dark:text-slate-300">Blood Glucose (mg/dL)</Label>
-                      <Button
-                        type="button"
-                        variant={vitalData.glucoseNotAvailable ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setVitalData({ ...vitalData, glucoseNotAvailable: !vitalData.glucoseNotAvailable, glucose: vitalData.glucoseNotAvailable ? vitalData.glucose : '' })}
-                      >
-                        Not Available
-                      </Button>
-                    </div>
-                    <Input
-                      type="number"
-                      placeholder="100"
-                      value={vitalData.glucose}
-                      onChange={(e) => setVitalData({ ...vitalData, glucose: e.target.value })}
-                      disabled={vitalData.glucoseNotAvailable}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'scoring' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg dark:text-white">Glasgow Coma Scale <span className="text-red-600">*</span></h3>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setVitalData({
-                        ...vitalData,
-                        gcsEye: '4',
-                        gcsVerbal: '5',
-                        gcsMotor: '6',
-                        gcsTotal: '15'
-                      });
-                      toast.success('GCS set to 15 - Alert & Oriented');
-                    }}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Brain className="h-4 w-4 mr-2" />
-                    GCS 15 (Alert & Oriented)
-                  </Button>
-                </div>
-                <div className="max-w-2xl space-y-6">
-                  {/* Eye Opening */}
-                  <div className="space-y-2">
-                    <Label className="text-base dark:text-slate-300">Eye Opening <span className="text-red-600">*</span></Label>
-                    <Select
-                      value={vitalData.gcsEye}
-                      onValueChange={(value) => setVitalData({ ...vitalData, gcsEye: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="4">Eyes open spontaneously (4)</SelectItem>
-                        <SelectItem value="3">Eyes open to sound (3)</SelectItem>
-                        <SelectItem value="2">Eyes open to pain (2)</SelectItem>
-                        <SelectItem value="1">No eye opening (1)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Verbal Response */}
-                  <div className="space-y-2">
-                    <Label className="text-base dark:text-slate-300">Verbal Response <span className="text-red-600">*</span></Label>
-                    <Select
-                      value={vitalData.gcsVerbal}
-                      onValueChange={(value) => setVitalData({ ...vitalData, gcsVerbal: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5">Oriented (5)</SelectItem>
-                        <SelectItem value="4">Confused conversation (4)</SelectItem>
-                        <SelectItem value="3">Inappropriate/random words (3)</SelectItem>
-                        <SelectItem value="2">Incomprehensible sounds (2)</SelectItem>
-                        <SelectItem value="1">No verbal response (1)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Motor Response */}
-                  <div className="space-y-2">
-                    <Label className="text-base dark:text-slate-300">Motor Response <span className="text-red-600">*</span></Label>
-                    <Select
-                      value={vitalData.gcsMotor}
-                      onValueChange={(value) => setVitalData({ ...vitalData, gcsMotor: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="6">Obeys/follows commands (6)</SelectItem>
-                        <SelectItem value="5">Localize to pain (5)</SelectItem>
-                        <SelectItem value="4">Withdrawal to pain (normal flexion) (4)</SelectItem>
-                        <SelectItem value="3">Abnormal flexion to pain (Decorticate) (3)</SelectItem>
-                        <SelectItem value="2">Abnormal extension to pain (Decerebrate) (2)</SelectItem>
-                        <SelectItem value="1">No motor response (1)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Total GCS Score */}
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base dark:text-slate-300">Total GCS Score</Label>
-                      <div className="text-3xl font-semibold text-green-700 dark:text-green-400">
-                        {vitalData.gcsTotal || '0'}
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Score range: 3-15</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'ecg' && (
-              <div className="space-y-6">
-                <h3 className="text-lg mb-4 dark:text-white">ECG</h3>
-                <div className="max-w-2xl space-y-4">
-                  <div className="space-y-2">
-                    <Label className="dark:text-slate-300">What Was Performed?</Label>
-                    <Select
-                      value={vitalData.ecgPerformed}
-                      onValueChange={(value) => setVitalData({ ...vitalData, ecgPerformed: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="4-lead">4 Lead</SelectItem>
-                        <SelectItem value="12-lead">12 Lead</SelectItem>
-                        <SelectItem value="posterior">Posterior</SelectItem>
-                        <SelectItem value="right-sided-12l">Right Sided 12L</SelectItem>
-                        <SelectItem value="neither">Neither</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {(vitalData.ecgPerformed === '4-lead' || vitalData.ecgPerformed === '12-lead') && (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="dark:text-slate-300">Attach ECG Picture</Label>
-                        <Button variant="outline" className="w-full">
-                          Upload ECG Image
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="dark:text-slate-300">Cardiac Rhythm</Label>
-                        <Input
-                          type="text"
-                          value={vitalData.ecgRhythm}
-                          onChange={(e) => setVitalData({ ...vitalData, ecgRhythm: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="dark:text-slate-300">Who Interpreted the Rhythm?</Label>
-                        <Select
-                          value={vitalData.ecgInterpretedBy}
-                          onValueChange={(value) => setVitalData({ ...vitalData, ecgInterpretedBy: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select interpreter..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="machine">Machine Interpretation</SelectItem>
-                            <SelectItem value="physician">Physician</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {vitalData.ecgInterpretedBy === 'physician' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="dark:text-slate-300">Physician Name</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setVitalData({ ...vitalData, ecgPhysicianName: 'Not Available' })}
-                            >
-                              Not Available
-                            </Button>
-                          </div>
-                          <Input
-                            type="text"
-                            value={vitalData.ecgPhysicianName}
-                            onChange={(e) => setVitalData({ ...vitalData, ecgPhysicianName: e.target.value })}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {activeCategory === 'painScales' && (
-              <div className="space-y-6">
-                <h3 className="text-lg mb-4 dark:text-white">Wong-Baker FACES Pain Rating Scale</h3>
-
-                <div className="space-y-6">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Select the face that best represents the patient's pain level</p>
-                  
-                  <div className="grid grid-cols-6 gap-4 max-w-4xl">
-                    {[
-                      { value: '0', emoji: '😊', label: 'NO HURT', description: 'No Pain' },
-                      { value: '2', emoji: '🙂', label: 'HURTS LITTLE BIT', description: '' },
-                      { value: '4', emoji: '😐', label: 'HURTS LITTLE MORE', description: '' },
-                      { value: '6', emoji: '😟', label: 'HURTS EVEN MORE', description: '' },
-                      { value: '8', emoji: '😣', label: 'HURTS WHOLE LOT', description: '' },
-                      { value: '10', emoji: '😭', label: 'HURTS WORSE', description: 'Worst Possible Pain' }
-                    ].map((face) => (
-                      <button
-                        key={face.value}
-                        onClick={() => setVitalData({ ...vitalData, pain: face.value })}
-                        className={`flex flex-col items-center p-4 border-2 rounded-lg transition-all ${
-                          vitalData.pain === face.value
-                            ? 'border-green-600 bg-green-50 dark:bg-green-900/30 shadow-md'
-                            : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow'
-                        }`}
-                      >
-                        <div className="text-5xl mb-2">{face.emoji}</div>
-                        <div className="text-2xl font-bold mb-1 dark:text-white">{face.value}</div>
-                        <div className="text-xs text-center font-medium leading-tight dark:text-slate-300">{face.label}</div>
-                        {face.description && (
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{face.description}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2 max-w-md">
-                    <Label className="dark:text-slate-300">Manual Pain Scale Entry (0-10)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      value={vitalData.pain}
-                      onChange={(e) => setVitalData({ ...vitalData, pain: e.target.value })}
-                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </div>
-
-                  <div className="bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base dark:text-slate-300">Pain Level</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 dark:text-slate-400">Moderate Pain</span>
-                        <div className="w-32 h-2 bg-white dark:bg-slate-600 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all"
-                            style={{ width: `${(parseFloat(vitalData.pain) || 0) * 10}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Clarification text box if pain is odd number */}
-                  {vitalData.pain && parseFloat(vitalData.pain) % 2 !== 0 && (
-                    <div className="space-y-2 mt-4">
-                      <Label className="dark:text-slate-300">Pain Level Clarification (odd number selected)</Label>
-                      <Textarea
-                        rows={3}
-                        value={vitalData.painClarification || ''}
-                        onChange={(e) => setVitalData({ ...vitalData, painClarification: e.target.value })}
-                      />
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Please provide additional details about the pain level</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -327,103 +327,59 @@ export const REQUIRED_FIELDS_BY_TAB: TabRequiredFields[] = [
     ],
   },
 
-  // ==================== ASSESSMENTS TAB ====================
+  // ==================== OBJECTIVE FINDINGS TAB (Combined: Assessments, Vitals, Treatments) ====================
   {
-    tabId: 'assessments',
-    tabName: 'Assessments',
+    tabId: 'objectiveFindings',
+    tabName: 'Objective Findings',
     sections: [
       {
-        name: 'Assessment Requirements',
+        name: 'Assessments',
         fields: [
           {
             name: 'minimumAssessment',
             label: 'Minimum 1 Assessment',
             path: 'assessments',
-            elementId: 'assessment-content',
+            elementId: 'assessments-section',
             isCompleted: (data) => hasMinimumAssessments(data.assessments),
           },
         ],
       },
-    ],
-  },
-
-  // ==================== VITALS TAB ====================
-  {
-    tabId: 'vitals',
-    tabName: 'Vitals',
-    sections: [
       {
-        name: 'Required Vitals (min 1 complete set)',
+        name: 'Vitals',
         fields: [
           {
-            name: 'time',
-            label: 'Time',
+            name: 'vitalTime',
+            label: 'Vitals Time',
             path: 'vitals[0].time',
-            elementId: 'vitals-table',
+            elementId: 'vitals-section',
             isCompleted: (data) => data.vitals?.some(v => hasValue(v.time)) || false,
           },
           {
-            name: 'date',
-            label: 'Date',
-            path: 'vitals[0].date',
-            elementId: 'vitals-table',
-            isCompleted: (data) => data.vitals?.some(v => hasValue(v.date)) || false,
-          },
-          {
-            name: 'avpu',
+            name: 'vitalAvpu',
             label: 'AVPU',
             path: 'vitals[0].avpu',
-            elementId: 'vitals-table',
+            elementId: 'vitals-section',
             isCompleted: (data) => data.vitals?.some(v => hasValue(v.avpu)) || false,
           },
           {
-            name: 'bp',
+            name: 'vitalBp',
             label: 'Blood Pressure',
             path: 'vitals[0].bp',
-            elementId: 'vitals-table',
+            elementId: 'vitals-section',
             isCompleted: (data) => data.vitals?.some(v => hasValue(v.bp)) || false,
           },
           {
-            name: 'bpTaken',
-            label: 'BP Method',
-            path: 'vitals[0].bpTaken',
-            elementId: 'vitals-table',
-            isCompleted: (data) => data.vitals?.some(v => hasValue(v.bpTaken)) || false,
-          },
-          {
-            name: 'pulse',
+            name: 'vitalPulse',
             label: 'Pulse',
             path: 'vitals[0].pulse',
-            elementId: 'vitals-table',
+            elementId: 'vitals-section',
             isCompleted: (data) => data.vitals?.some(v => hasValue(v.pulse)) || false,
-          },
-          {
-            name: 'respiration',
-            label: 'Respiratory Rate',
-            path: 'vitals[0].respiration',
-            elementId: 'vitals-table',
-            isCompleted: (data) => data.vitals?.some(v => hasValue(v.respiration)) || false,
-          },
-          {
-            name: 'gcs',
-            label: 'GCS',
-            path: 'vitals[0].gcsTotal',
-            elementId: 'vitals-table',
-            isCompleted: (data) => data.vitals?.some(v => hasValue(v.gcsTotal)) || false,
           },
         ],
       },
-    ],
-  },
-
-  // ==================== TREATMENT TAB ====================
-  {
-    tabId: 'treatment',
-    tabName: 'Treatment',
-    sections: [
       {
-        name: 'Interventions',
-        fields: [], // No required fields for treatment tab
+        name: 'Treatments',
+        fields: [], // No required fields for treatments, but section is shown for completeness
       },
     ],
   },

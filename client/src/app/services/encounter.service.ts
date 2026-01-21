@@ -15,6 +15,7 @@ import type {
   Vitals,
   VitalsDTO,
   AmendmentDTO,
+  SavedDraftsResponse,
 } from '../types/api.types.js';
 import type { Encounter } from '../types/index.js';
 
@@ -87,6 +88,7 @@ function logEhrAttempt(encounterId: string | null, action: string, details?: Rec
 
 const ENCOUNTER_ENDPOINTS = {
   base: '/encounters',
+  drafts: '/encounters/drafts',
   byId: (id: string) => `/encounters/${id}`,
   vitals: (id: string) => `/encounters/${id}/vitals`,
   amend: (id: string) => `/encounters/${id}/amend`,
@@ -640,6 +642,48 @@ export async function finalizeEncounter(id: string): Promise<FinalizeEncounterRe
 }
 
 // ============================================================================
+// Saved Drafts Functions
+// ============================================================================
+
+/**
+ * Get all draft encounters for the current user
+ *
+ * Returns a list of draft (in_progress) encounters that the current
+ * user has created and can continue editing.
+ *
+ * @param limit - Maximum number of drafts to return (default 10)
+ * @returns Promise resolving to saved drafts response
+ *
+ * @example
+ * ```typescript
+ * const draftsResponse = await getDrafts();
+ * console.log(`You have ${draftsResponse.count} saved drafts`);
+ * draftsResponse.drafts.forEach(draft => {
+ *   console.log(`${draft.patient_display_name} - ${draft.modified_at}`);
+ * });
+ * ```
+ */
+export async function getDrafts(limit = 10): Promise<SavedDraftsResponse> {
+  logEhrAttempt(null, 'GET_DRAFTS', { limit });
+  
+  try {
+    const response = await get<SavedDraftsResponse>(ENCOUNTER_ENDPOINTS.drafts, {
+      params: { limit }
+    });
+    
+    logEhrSuccess(null, 'GET_DRAFTS', { count: response.data.count });
+    
+    return {
+      drafts: response.data.drafts || [],
+      count: response.data.count || 0,
+    };
+  } catch (error) {
+    logEhrError(null, 'GET_DRAFTS', error);
+    throw error;
+  }
+}
+
+// ============================================================================
 // Export as Namespace Object
 // ============================================================================
 
@@ -658,6 +702,7 @@ export const encounterService = {
   submitEncounter,
   submitForReview,
   finalizeEncounter,
+  getDrafts,
 } as const;
 
 export default encounterService;

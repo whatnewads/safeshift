@@ -408,6 +408,42 @@ class EncounterRepository implements RepositoryInterface
     }
 
     /**
+     * Get draft encounters for a specific user
+     *
+     * Draft = status is 'in_progress'
+     * Returns encounters with patient name via LEFT JOIN
+     *
+     * @param string $userId The user ID (created_by)
+     * @param int $limit Maximum number of results (default: 10)
+     * @return array Array of draft encounter data with patient names
+     */
+    public function getDraftsByUser(string $userId, int $limit = 10): array
+    {
+        $sql = "SELECT
+                    e.encounter_id,
+                    e.patient_id,
+                    CONCAT(p.legal_first_name, ' ', p.legal_last_name) AS patient_name,
+                    e.chief_complaint,
+                    e.encounter_type,
+                    e.created_at,
+                    e.modified_at
+                FROM {$this->table} e
+                LEFT JOIN patients p ON e.patient_id = p.patient_id
+                WHERE e.created_by = :user_id
+                  AND e.status = 'in_progress'
+                  AND e.deleted_at IS NULL
+                ORDER BY e.modified_at DESC
+                LIMIT :limit";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':user_id', $userId);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Find single encounter matching criteria
      *
      * @param array<string, mixed> $criteria Search criteria

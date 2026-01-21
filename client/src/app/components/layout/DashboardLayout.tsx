@@ -4,8 +4,6 @@ import {
   Settings,
   User,
   LogOut,
-  WifiOff,
-  Wifi,
   Home,
   FileText,
   Users,
@@ -23,7 +21,6 @@ import {
   Moon,
   Sun,
   Plus,
-  Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -34,6 +31,7 @@ import { SimpleDropdown, SimpleDropdownItem, SimpleDropdownLabel, SimpleDropdown
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { SetShiftModal } from '../shift/SetShiftModal';
+import { SavedReportsDropdown, type ConnectionStatus } from '../header/SavedReportsDropdown';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSync } from '../../contexts/SyncContext';
 import { useShift } from '../../contexts/ShiftContext';
@@ -41,9 +39,6 @@ import { useEncounter } from '../../contexts/EncounterContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { EncounterNav } from '../encounter/EncounterNav';
 import { useNotifications } from '../../hooks/useNotifications.js';
-
-// Connection status type for Wi-Fi indicator
-type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 
 // Helper function to format role names
 const formatRoleName = (role: string): string => {
@@ -124,36 +119,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
   }, [connectionStatus, triggerSync]);
-
-  // Get Wi-Fi status indicator props
-  const getWifiStatusProps = useCallback(() => {
-    switch (connectionStatus) {
-      case 'connected':
-        return {
-          icon: Wifi,
-          className: 'text-green-600',
-          title: 'Connected to Wi-Fi. Reports will automatically sync.',
-          onClick: undefined,
-          cursor: 'cursor-default',
-        };
-      case 'disconnected':
-        return {
-          icon: WifiOff,
-          className: 'text-red-600',
-          title: 'Not connected. Click to attempt reconnect. Reports will be saved to local files.',
-          onClick: handleReconnect,
-          cursor: 'cursor-pointer',
-        };
-      case 'reconnecting':
-        return {
-          icon: Wifi,
-          className: 'text-yellow-500 animate-wifi-blink',
-          title: 'Attempting to reconnect...',
-          onClick: undefined,
-          cursor: 'cursor-wait',
-        };
-    }
-  }, [connectionStatus, handleReconnect]);
 
   if (!user) return null;
 
@@ -393,31 +358,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               
             </SimpleDropdown>
 
-            {/* Wi-Fi/Sync Status */}
-            {(() => {
-              const wifiProps = getWifiStatusProps();
-              const WifiIcon = wifiProps.icon;
-              return (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={wifiProps.onClick || (connectionStatus === 'connected' ? triggerSync : undefined)}
-                  className={`gap-2 ${wifiProps.cursor}`}
-                  title={wifiProps.title}
-                  disabled={connectionStatus === 'reconnecting'}
-                >
-                  <WifiIcon className={`h-4 w-4 ${wifiProps.className}`} />
-                  {pendingCount > 0 && (
-                    <Badge variant="destructive" className="ml-1">
-                      {pendingCount}
-                    </Badge>
-                  )}
-                  {(isSyncing || connectionStatus === 'reconnecting') && (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  )}
-                </Button>
-              );
-            })()}
+            {/* Wi-Fi/Sync Status with Saved Reports Dropdown */}
+            <SavedReportsDropdown
+              connectionStatus={connectionStatus}
+              onReconnect={handleReconnect}
+              onSync={triggerSync}
+              pendingCount={pendingCount}
+              isSyncing={isSyncing}
+            />
 
             {/* Notifications */}
             <Button variant="ghost" size="sm" asChild className="relative">

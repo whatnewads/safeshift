@@ -12,6 +12,7 @@ declare(strict_types=1);
  * - GET    /api/v1/patients/recent               - Get recent patients
  * - GET    /api/v1/patients/mrn/{mrn}            - Find by MRN
  * - GET    /api/v1/patients/{id}                 - Get single patient
+ * - GET    /api/v1/patients/{id}/timeline        - Get patient timeline
  * - POST   /api/v1/patients                      - Create new patient
  * - PUT    /api/v1/patients/{id}                 - Update patient
  * - DELETE /api/v1/patients/{id}                 - Deactivate patient
@@ -114,6 +115,13 @@ function handleGetPatients(PatientViewModel $viewModel, string $action, string $
         return;
     }
     
+    // GET /patients/{id}/timeline - Get patient timeline
+    if (isPatientUuid($action) && $subAction === 'timeline') {
+        $result = $viewModel->getPatientTimeline($action);
+        ApiResponse::send($result, $result['success'] ? 200 : ($result['error']['code'] ?? 500));
+        return;
+    }
+    
     // GET /patients/{id}/encounters
     if (isPatientUuid($action) && $subAction === 'encounters') {
         // This would typically call an EncounterViewModel
@@ -123,7 +131,7 @@ function handleGetPatients(PatientViewModel $viewModel, string $action, string $
     }
     
     // GET /patients/{id} - Get single patient
-    if (!empty($action) && isPatientUuid($action)) {
+    if (!empty($action) && isPatientUuid($action) && empty($subAction)) {
         $result = $viewModel->getPatient($action);
         ApiResponse::send($result, $result['success'] ? 200 : ($result['error']['code'] ?? 500));
         return;

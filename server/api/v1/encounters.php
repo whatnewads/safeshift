@@ -237,6 +237,29 @@ function handleEncounterGetRequest(EncounterViewModel $viewModel, array $segment
     
     $action = $segments[0];
     
+    // GET /encounters/drafts - Get user's draft encounters (saved reports)
+    if ($action === 'drafts') {
+        $response = $viewModel->getDrafts();
+        
+        // Log draft access (only if logger available)
+        if ($ehrLogger !== null) {
+            try {
+                $ehrLogger->logOperation(EHRLogger::OP_READ, [
+                    'details' => [
+                        'action' => 'list_draft_encounters',
+                        'results_count' => count($response['data']['drafts'] ?? []),
+                    ],
+                    'result' => ($response['status'] ?? 200) < 400 ? 'success' : 'failure',
+                ], EHRLogger::CHANNEL_ENCOUNTER);
+            } catch (\Throwable $e) {
+                error_log("[Encounters] Draft logging failed: " . $e->getMessage());
+            }
+        }
+        
+        ApiResponse::send($response, $response['status'] ?? 200);
+        return;
+    }
+    
     // GET /encounters/today - Today's encounters
     // Note: clinic_id will be taken from session if not provided via query param
     // The EncounterViewModel.getTodaysEncounters() handles this and returns 400 if no clinic_id available

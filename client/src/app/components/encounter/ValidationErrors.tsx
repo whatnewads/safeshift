@@ -6,16 +6,14 @@
  */
 
 import { useMemo } from 'react';
-import { 
-  X, 
-  AlertCircle, 
-  AlertTriangle, 
+import {
+  X,
+  AlertCircle,
+  AlertTriangle,
   ChevronRight,
   FileText,
   User,
-  ClipboardList,
-  Activity,
-  Pill,
+  Stethoscope,
   AlignLeft,
   FileCheck,
   PenTool,
@@ -46,12 +44,8 @@ function getTabIcon(tabId: string) {
       return <FileText className={iconClass} />;
     case 'patient':
       return <User className={iconClass} />;
-    case 'assessments':
-      return <ClipboardList className={iconClass} />;
-    case 'vitals':
-      return <Activity className={iconClass} />;
-    case 'treatment':
-      return <Pill className={iconClass} />;
+    case 'objectiveFindings':
+      return <Stethoscope className={iconClass} />;
     case 'narrative':
       return <AlignLeft className={iconClass} />;
     case 'disposition':
@@ -80,8 +74,8 @@ export function ValidationErrors({
   
   // Get tab order for consistent display
   const tabOrder = [
-    'incident', 'patient', 'assessments', 'vitals', 
-    'treatment', 'narrative', 'disposition', 'signatures'
+    'incident', 'patient', 'objectiveFindings',
+    'narrative', 'disposition', 'signatures'
   ];
   
   // Sort tabs by their order

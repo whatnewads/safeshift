@@ -697,4 +697,81 @@ class PatientViewModel
             'updatedAt' => $data['updated_at'],
         ]);
     }
+
+    /**
+     * Get patient timeline with all encounters
+     *
+     * Returns patient information along with a chronological timeline of all encounters.
+     * This is used for the Patient Timeline View feature.
+     *
+     * @param string $patientId Patient UUID
+     * @return array API response with timeline data
+     */
+    public function getPatientTimeline(string $patientId): array
+    {
+        try {
+            // Validate patient ID format
+            if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $patientId)) {
+                return ApiResponse::error('Invalid patient ID format', 400);
+            }
+
+            // Get patient
+            $patient = $this->repository->findById($patientId);
+            if (!$patient) {
+                $this->logFailure('read', 'patient_timeline', $patientId, 'Patient not found');
+                return ApiResponse::error('Patient not found', 404);
+            }
+
+            // Log PHI access for HIPAA compliance
+            $this->logRead(
+                resourceType: 'patient_timeline',
+                resourceId: $patientId,
+                patientId: $patientId,
+                description: "Accessed patient timeline: {$patient->getFullName()}"
+            );
+
+            // Get all encounters for patient using EncounterRepository
+            $encounterRepo = new \Core\Repositories\EncounterRepository($this->repository->getPdo());
+            $encounters = $encounterRepo->getPatientTimeline($patientId);
+
+            // Calculate timeline metadata
+            $firstEncounterDate = null;
+            $lastEncounterDate = null;
+            $totalEncounters = count($encounters);
+
+            foreach ($encounters as $encounter) {
+                $occurredOn = $encounter['occurred_on'] ?? null;
+                if ($occurredOn) {
+                    $encounterDate = substr($occurredOn, 0, 10); // Get date part only (Y-m-d)
+                    
+                    if ($firstEncounterDate === null || $encounterDate < $firstEncounterDate) {
+                        $firstEncounterDate = $encounterDate;
+                    }
+                    if ($lastEncounterDate === null || $encounterDate > $lastEncounterDate) {
+                        $lastEncounterDate = $encounterDate;
+                    }
+                }
+            }
+
+            return ApiResponse::success([
+                'patient' => [
+                    'patient_id' => $patient->getId(),
+                    'name' => $patient->getFullName(),
+                    'dob' => $patient->getDateOfBirth()->format('Y-m-d'),
+                    'sex' => $patient->getGender(),
+                ],
+                'timeline' => [
+                    'first_encounter_date' => $firstEncounterDate,
+                    'last_encounter_date' => $lastEncounterDate,
+                    'total_encounters' => $totalEncounters,
+                    'current_date' => date('Y-m-d'),
+                ],
+                'encounters' => $encounters,
+            ]);
+        } catch (\Exception $e) {
+            error_log("PatientViewModel::getPatientTimeline error: " . $e->getMessage());
+            $this->logFailure('read', 'patient_timeline', $patientId, $e->getMessage(), $patientId);
+            return ApiResponse::error('Failed to retrieve patient timeline', 500);
+        }
+    }
 }

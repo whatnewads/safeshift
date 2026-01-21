@@ -355,6 +355,46 @@ class EncounterRepository
     }
     
     /**
+     * Get patient timeline data
+     * Returns all encounters for a patient ordered chronologically for timeline display
+     *
+     * @param string $patientId Patient UUID
+     * @return array Array of encounter data for timeline
+     */
+    public function getPatientTimeline(string $patientId): array
+    {
+        $sql = "SELECT
+                    encounter_id,
+                    encounter_type,
+                    chief_complaint,
+                    status,
+                    created_at,
+                    started_at as occurred_on
+                FROM encounters
+                WHERE patient_id = :patient_id
+                AND status != 'voided'
+                ORDER BY started_at ASC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':patient_id', $patientId, PDO::PARAM_STR);
+        $stmt->execute();
+        
+        $results = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $results[] = [
+                'encounter_id' => $row['encounter_id'],
+                'encounter_type' => $row['encounter_type'],
+                'chief_complaint' => $row['chief_complaint'],
+                'status' => $row['status'],
+                'created_at' => $row['created_at'] ? date('Y-m-d\TH:i:s\Z', strtotime($row['created_at'])) : null,
+                'occurred_on' => $row['occurred_on'] ? date('Y-m-d\TH:i:s\Z', strtotime($row['occurred_on'])) : null,
+            ];
+        }
+        
+        return $results;
+    }
+    
+    /**
      * Generate UUID v4
      */
     private function generateUuid(): string

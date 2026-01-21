@@ -43,6 +43,7 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  History,
 } from 'lucide-react';
 import type { PatientFilters } from '../types/api.types.js';
 
@@ -598,6 +599,15 @@ export default function PatientsPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
+                                navigate(`/patients/${patient.id}/timeline`);
+                              }}
+                            >
+                              <History className="h-4 w-4 mr-2" />
+                              View Timeline
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 navigate(`/patients/${patient.id}`);
                               }}
                             >
@@ -680,8 +690,7 @@ export default function PatientsPage() {
             filteredPatients.map((patient) => (
               <Card
                 key={patient.id}
-                className="p-6 cursor-pointer hover:shadow-lg transition-shadow dark:hover:bg-slate-800"
-                onClick={() => navigate(`/patients/${patient.id}`)}
+                className="p-6 hover:shadow-lg transition-shadow dark:hover:bg-slate-800"
               >
                 <div className="space-y-4">
                   {/* Header */}
@@ -729,6 +738,28 @@ export default function PatientsPage() {
                       {patient.provider}
                     </span>
                     {getStatusBadge(patient.encounterStatus)}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => navigate(`/patients/${patient.id}/timeline`)}
+                    >
+                      <History className="h-4 w-4 mr-2" />
+                      Timeline
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => navigate(`/patients/${patient.id}`)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
                   </div>
                 </div>
               </Card>

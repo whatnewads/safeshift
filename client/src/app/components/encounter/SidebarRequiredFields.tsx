@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useRequiredFields, createEncounterData } from '../../hooks/useRequiredFields.js';
 import type { EncounterData } from '../../config/requiredFields.js';
 import type { SectionStatus, FieldStatus } from '../../hooks/useRequiredFields.js';
+import { TabProgressIcons } from './TabProgressIcons.js';
 
 interface SidebarRequiredFieldsProps {
   activeTab: string;
   encounterData: EncounterData;
   onFieldClick?: ((elementId: string) => void) | undefined;
+  onTabClick?: (tabId: string) => void;
 }
 
 /**
@@ -21,9 +23,11 @@ export function SidebarRequiredFields({
   activeTab,
   encounterData,
   onFieldClick,
+  onTabClick,
 }: SidebarRequiredFieldsProps) {
   const {
     currentTabStatus,
+    allTabsStatus,
     overallCompletion,
     focusField,
   } = useRequiredFields(activeTab, encounterData);
@@ -117,10 +121,19 @@ export function SidebarRequiredFields({
         </div>
         
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          {currentTabStatus.isComplete 
-            ? 'All required fields complete' 
+          {currentTabStatus.isComplete
+            ? 'All required fields complete'
             : `${currentTabStatus.percentage}% complete`}
         </p>
+
+        {/* Tab Progress Icons */}
+        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+          <TabProgressIcons
+            allTabsStatus={allTabsStatus}
+            activeTab={activeTab}
+            onTabClick={onTabClick}
+          />
+        </div>
       </div>
 
       {/* Sections and fields */}
@@ -245,6 +258,7 @@ interface SidebarRequiredFieldsWrapperProps {
   disposition?: string;
   disclosures?: Record<string, boolean>;
   onFieldClick?: (elementId: string) => void;
+  onTabClick?: (tabId: string) => void;
 }
 
 export function SidebarRequiredFieldsWrapper({
@@ -258,6 +272,7 @@ export function SidebarRequiredFieldsWrapper({
   disposition = '',
   disclosures = {},
   onFieldClick,
+  onTabClick,
 }: SidebarRequiredFieldsWrapperProps) {
   const encounterData = useMemo(() => createEncounterData(
     incidentForm,
@@ -275,6 +290,7 @@ export function SidebarRequiredFieldsWrapper({
       activeTab={activeTab}
       encounterData={encounterData}
       onFieldClick={onFieldClick}
+      onTabClick={onTabClick}
     />
   );
 }

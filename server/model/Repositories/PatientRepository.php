@@ -557,6 +557,16 @@ class PatientRepository implements RepositoryInterface
     }
 
     /**
+     * Get the PDO instance
+     *
+     * @return PDO The PDO database connection
+     */
+    public function getPdo(): PDO
+    {
+        return $this->pdo;
+    }
+
+    /**
      * Insert a new patient
      */
     private function insert(Patient $patient): bool

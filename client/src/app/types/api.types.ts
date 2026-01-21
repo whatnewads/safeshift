@@ -1052,3 +1052,89 @@ export interface ReportData {
  * Export format options
  */
 export type ExportFormat = 'csv' | 'json' | 'pdf' | 'xlsx';
+
+// ============================================================================
+// Saved Drafts Types
+// ============================================================================
+
+/**
+ * Saved draft encounter for the dropdown menu
+ */
+export interface SavedDraft {
+  /** Encounter ID */
+  encounter_id: string;
+  /** Patient ID (null if new patient not yet saved) */
+  patient_id: string | null;
+  /** Patient display name (or "New Patient" if patient_id is null) */
+  patient_display_name: string;
+  /** Chief complaint or reason for visit */
+  chief_complaint: string | null;
+  /** Encounter type (e.g., "clinic", "field") */
+  encounter_type: string;
+  /** When the encounter was created */
+  created_at: string;
+  /** When the encounter was last modified */
+  modified_at: string;
+}
+
+/**
+ * API response for saved drafts endpoint
+ */
+export interface SavedDraftsResponse {
+  /** Array of saved draft encounters */
+  drafts: SavedDraft[];
+  /** Total count of drafts */
+  count: number;
+}
+
+// ============================================================================
+// Patient Timeline Types
+// ============================================================================
+
+/**
+ * Timeline encounter data for patient timeline view
+ */
+export interface TimelineEncounter {
+  /** Unique encounter identifier */
+  encounter_id: string;
+  /** Type of encounter (e.g., "clinic", "field") */
+  encounter_type: string;
+  /** Chief complaint or reason for visit */
+  chief_complaint: string | null;
+  /** Encounter status (e.g., "completed", "in_progress") */
+  status: string;
+  /** When the encounter was created */
+  created_at: string;
+  /** When the encounter occurred */
+  occurred_on: string;
+}
+
+/**
+ * Complete patient timeline response from API
+ */
+export interface PatientTimelineResponse {
+  /** Patient information */
+  patient: {
+    /** Patient UUID */
+    patient_id: string;
+    /** Patient full name */
+    name: string;
+    /** Date of birth (YYYY-MM-DD) */
+    dob: string;
+    /** Patient sex */
+    sex: string;
+  };
+  /** Timeline summary information */
+  timeline: {
+    /** Date of first encounter (null if no encounters) */
+    first_encounter_date: string | null;
+    /** Date of last encounter (null if no encounters) */
+    last_encounter_date: string | null;
+    /** Total number of encounters */
+    total_encounters: number;
+    /** Current date for reference */
+    current_date: string;
+  };
+  /** Array of encounters for the timeline */
+  encounters: TimelineEncounter[];
+}
