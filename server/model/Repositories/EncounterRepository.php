@@ -413,34 +413,74 @@ class EncounterRepository implements RepositoryInterface
      * Draft = status is 'in_progress'
      * Returns encounters with patient name via LEFT JOIN
      *
-     * @param string $userId The user ID (created_by)
+     * NOTE: We query by npi_provider (which stores the user ID from session)
+     * rather than created_by, because:
+     * - created_by is int(10) but user_id may be a UUID string
+     * - npi_provider is set from $currentUserId when creating encounters
+     *
+     * @param string $userId The user ID (provider ID)
      * @param int $limit Maximum number of results (default: 10)
      * @return array Array of draft encounter data with patient names
      */
     public function getDraftsByUser(string $userId, int $limit = 10): array
     {
+        // DEBUG: Log input parameters
+        error_log("[DEBUG getDraftsByUser] userId = '$userId', limit = $limit");
+        
+        // Query by npi_provider (provider ID) since that's set from currentUserId
+        // Also fallback to created_by for backwards compatibility
+        // NOTE: The npi_provider column appears to be truncated (VARCHAR(10) or similar)
+        // so we use LIKE matching with the first 10 characters of the UUID
+        // and also check if the stored npi_provider is a prefix of the user_id
+        $userIdPrefix = substr($userId, 0, 10);
+        $userIdInt = is_numeric($userId) ? (int)$userId : 0;
+        
         $sql = "SELECT
                     e.encounter_id,
                     e.patient_id,
-                    CONCAT(p.legal_first_name, ' ', p.legal_last_name) AS patient_name,
+                    CONCAT(COALESCE(p.legal_first_name, ''), ' ', COALESCE(p.legal_last_name, '')) AS patient_name,
                     e.chief_complaint,
                     e.encounter_type,
                     e.created_at,
-                    e.modified_at
+                    e.modified_at,
+                    e.npi_provider,
+                    e.created_by,
+                    e.status
                 FROM {$this->table} e
                 LEFT JOIN patients p ON e.patient_id = p.patient_id
-                WHERE e.created_by = :user_id
+                WHERE (
+                    e.npi_provider = :user_id_full
+                    OR e.npi_provider = :user_id_prefix
+                    OR :user_id_for_like LIKE CONCAT(e.npi_provider, '%')
+                    OR e.created_by = :user_id_int
+                )
                   AND e.status = 'in_progress'
                   AND e.deleted_at IS NULL
-                ORDER BY e.modified_at DESC
+                ORDER BY COALESCE(e.modified_at, e.created_at) DESC
                 LIMIT :limit";
         
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':user_id', $userId);
+        // Bind full UUID for exact match
+        $stmt->bindValue(':user_id_full', $userId, PDO::PARAM_STR);
+        // Bind truncated version (first 10 chars) to match DB column limit
+        $stmt->bindValue(':user_id_prefix', $userIdPrefix, PDO::PARAM_STR);
+        // Bind again for the LIKE comparison (PDO requires unique parameter names)
+        $stmt->bindValue(':user_id_for_like', $userId, PDO::PARAM_STR);
+        // Bind as int for created_by (int column) - handles numeric user IDs
+        $stmt->bindValue(':user_id_int', $userIdInt, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        
+        // DEBUG: Log the query parameters
+        error_log("[DEBUG getDraftsByUser] SQL Query with user_id='$userId', user_id_prefix='$userIdPrefix', user_id_int=$userIdInt");
+        
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // DEBUG: Log result count
+        error_log("[DEBUG getDraftsByUser] Found " . count($results) . " drafts");
+        
+        return $results;
     }
 
     /**

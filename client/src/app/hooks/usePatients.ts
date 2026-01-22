@@ -75,15 +75,23 @@ export function usePatients(): UsePatientsReturn {
     try {
       // patientService.getPatients returns PaginatedResponse<Patient> directly
       const paginatedData = await patientService.getPatients(filters);
-      setPatients(paginatedData.data);
+      
+      // Defensive: ensure we always have an array, even if API returns unexpected structure
+      const patientArray = Array.isArray(paginatedData?.data)
+        ? paginatedData.data
+        : [];
+      
+      setPatients(patientArray);
       setPagination({
-        total: paginatedData.total,
-        page: paginatedData.page,
-        limit: paginatedData.limit,
-        totalPages: paginatedData.totalPages ?? Math.ceil(paginatedData.total / paginatedData.limit),
+        total: paginatedData?.total ?? patientArray.length,
+        page: paginatedData?.page ?? 1,
+        limit: paginatedData?.limit ?? 20,
+        totalPages: paginatedData?.totalPages ?? Math.ceil((paginatedData?.total ?? patientArray.length) / (paginatedData?.limit ?? 20)),
       });
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to fetch patients'));
+      // Ensure patients is always an array even on error
+      setPatients([]);
     } finally {
       setLoading(false);
     }

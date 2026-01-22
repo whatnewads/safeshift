@@ -78,11 +78,53 @@ export async function getPatients(
   filters?: PatientFilters
 ): Promise<PaginatedResponse<Patient>> {
   const params = filtersToParams(filters);
-  const response = await get<PaginatedResponse<Patient>>(
+  const response = await get<{
+    // Handle multiple possible response structures from backend
+    data?: Patient[];
+    items?: Patient[];
+    patients?: Patient[];
+    total?: number;
+    page?: number;
+    limit?: number;
+    per_page?: number;
+    totalPages?: number;
+    total_pages?: number;
+    pagination?: {
+      total?: number;
+      page?: number;
+      per_page?: number;
+      total_pages?: number;
+    };
+  }>(
     PATIENT_ENDPOINTS.base,
     params ? { params } : undefined
   );
-  return response.data;
+  
+  // Transform API response to expected PaginatedResponse format
+  // Handle multiple possible backend response structures
+  const rawData = response.data;
+  
+  // Extract patients array from various possible field names
+  const patients: Patient[] =
+    rawData.data ??
+    rawData.items ??
+    rawData.patients ??
+    (Array.isArray(rawData) ? rawData : []);
+  
+  // Extract pagination info from various possible structures
+  const pagination = rawData.pagination || {};
+  const total = rawData.total ?? pagination.total ?? patients.length;
+  const page = rawData.page ?? pagination.page ?? 1;
+  const limit = rawData.limit ?? rawData.per_page ?? pagination.per_page ?? 20;
+  const totalPages = rawData.totalPages ?? rawData.total_pages ?? pagination.total_pages ?? Math.ceil(total / limit);
+  
+  return {
+    data: patients,
+    total,
+    page,
+    limit,
+    totalPages,
+  };
 }
 
 /**

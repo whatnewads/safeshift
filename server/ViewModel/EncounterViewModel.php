@@ -981,6 +981,9 @@ class EncounterViewModel
             return $patient;
         }
         
+        // Log that we couldn't find patient by ID - will attempt to create
+        error_log("findOrCreatePatient: Patient not found by ID '{$patientId}', attempting to extract demographics");
+        
         // 2. Extract patient data from request (supports both camelCase and snake_case)
         $firstName = $data['patient_first_name'] ?? $data['patientFirstName'] ?? null;
         $lastName = $data['patient_last_name'] ?? $data['patientLastName'] ?? null;
@@ -1000,10 +1003,15 @@ class EncounterViewModel
             $dob = $patientForm['dob'];
         }
         
+        // Log extracted demographics for debugging
+        error_log("findOrCreatePatient: Extracted demographics - firstName: " . ($firstName ?: 'NULL') .
+                  ", lastName: " . ($lastName ?: 'NULL') . ", dob: " . ($dob ?: 'NULL'));
+        
         // 3. Try to find existing patient by name + DOB (SSN columns don't exist in this schema)
         if ($firstName && $lastName && $dob) {
             $patient = $this->findPatientByNameAndDob($firstName, $lastName, $dob);
             if ($patient) {
+                error_log("findOrCreatePatient: Found existing patient by name+DOB: " . $patient->getId());
                 return $patient;
             }
         }
@@ -1011,9 +1019,11 @@ class EncounterViewModel
         // 4. If we have enough data, create a new patient directly
         if ($firstName && $lastName && $dob) {
             try {
+                error_log("findOrCreatePatient: Creating new patient with firstName={$firstName}, lastName={$lastName}, dob={$dob}");
                 $patient = $this->createPatientDirect($firstName, $lastName, $dob, $data, $patientForm);
                 
                 if ($patient) {
+                    error_log("findOrCreatePatient: Successfully created patient: " . $patient->getId());
                     $this->ehrLogger->logOperation('CREATE', [
                         'patient_id' => $patient->getId(),
                         'details' => [
@@ -1022,6 +1032,12 @@ class EncounterViewModel
                         ],
                         'result' => 'success',
                     ], EHRLogger::CHANNEL_EHR);
+                } else {
+                    error_log("findOrCreatePatient: createPatientDirect returned null");
+                    $this->ehrLogger->logError('CREATE_PATIENT', 'createPatientDirect returned null', [
+                        'channel' => EHRLogger::CHANNEL_EHR,
+                        'patient_id_attempted' => $patientId,
+                    ]);
                 }
                 
                 return $patient;
@@ -1029,12 +1045,27 @@ class EncounterViewModel
                 $this->ehrLogger->logError('CREATE_PATIENT', $e->getMessage(), [
                     'channel' => EHRLogger::CHANNEL_EHR,
                 ]);
-                error_log("Failed to create patient: " . $e->getMessage());
+                error_log("findOrCreatePatient: Exception creating patient: " . $e->getMessage());
                 return null;
             }
         }
         
-        // 5. Not enough data to find or create patient
+        // 5. Not enough data to find or create patient - log what's missing
+        $missing = [];
+        if (!$firstName) $missing[] = 'firstName';
+        if (!$lastName) $missing[] = 'lastName';
+        if (!$dob) $missing[] = 'dob';
+        
+        $this->ehrLogger->logError('CREATE_ENCOUNTER', 'Missing patient demographics', [
+            'channel' => EHRLogger::CHANNEL_ENCOUNTER,
+            'patient_id_attempted' => $patientId,
+            'missing_fields' => $missing,
+            'has_formData' => !empty($formData),
+            'has_patientForm' => !empty($patientForm),
+        ]);
+        error_log("findOrCreatePatient: Cannot create patient - missing fields: " . implode(', ', $missing) .
+                  ". Request patient_id was: {$patientId}");
+        
         return null;
     }
     
@@ -1133,11 +1164,11 @@ class EncounterViewModel
         $sql = "INSERT INTO patients (
                     patient_id, legal_first_name, legal_last_name, dob,
                     sex_assigned_at_birth, phone, email, zip_code,
-                    created_at, created_by
+                    is_active, created_at, created_by
                 ) VALUES (
                     :patient_id, :first_name, :last_name, :dob,
                     :sex, :phone, :email, :zip_code,
-                    NOW(), :created_by
+                    1, NOW(), :created_by
                 )";
         
         $stmt = $pdo->prepare($sql);
@@ -1248,6 +1279,11 @@ class EncounterViewModel
         $providerId = $data['provider_id'] ?? $data['providerId'] ?? null;
 
         $encounter = new Encounter($patientId, $encounterType, $providerId);
+        
+        // Default new encounters to 'in_progress' so they appear in drafts
+        // The Encounter constructor defaults to 'scheduled', but for API-created
+        // encounters, we want them to be editable drafts by default
+        $encounter->setStatus('in_progress');
 
         return $this->updateEncounterFromData($encounter, $data);
     }
@@ -1311,9 +1347,10 @@ class EncounterViewModel
             }
         }
 
-        // Status can always be updated
+        // Status can always be updated - normalize to valid database enum values
+        // This ensures 'draft' maps to 'in_progress', etc.
         if (isset($data['status'])) {
-            $encounter->setStatus($data['status']);
+            $encounter->setStatus($this->normalizeStatus($data['status']));
         }
 
         return $encounter;
@@ -1382,13 +1419,20 @@ class EncounterViewModel
      */
     public function getDrafts(): array
     {
+        // DEBUG: Log the current user ID being used for the drafts query
+        error_log("[DEBUG getDrafts] currentUserId = " . ($this->currentUserId ?? 'NULL'));
+        
         if (!$this->currentUserId) {
+            error_log("[DEBUG getDrafts] User not authenticated - no currentUserId set");
             return ApiResponse::unauthorized('User not authenticated');
         }
 
         try {
             // Get drafts from repository
+            error_log("[DEBUG getDrafts] Calling getDraftsByUser with userId=" . $this->currentUserId);
             $drafts = $this->encounterRepository->getDraftsByUser($this->currentUserId, 10);
+            error_log("[DEBUG getDrafts] getDraftsByUser returned " . count($drafts) . " drafts");
+            error_log("[DEBUG getDrafts] Raw drafts result: " . json_encode($drafts));
 
             // Format the response with patient display name logic
             $formattedDrafts = array_map(function ($draft) {

@@ -306,11 +306,10 @@ interface NavLinksProps {
 
 function NavLinks({ activeSection }: NavLinksProps) {
   const sections = [
-    { id: 'datetime', label: 'Date/Time' },
-    { id: 'neuro', label: 'Neurological' },
-    { id: 'cardio', label: 'Cardiovascular' },
-    { id: 'respiratory', label: 'Respiratory' },
-    { id: 'other', label: 'Other' },
+    { id: 'neuro', label: 'LOC, Responsiveness' },
+    { id: 'cardio', label: 'Pulse, Pressure' },
+    { id: 'respiratory', label: 'Rate, SpO2' },
+    { id: 'other', label: 'Pain Scale' },
   ];
 
   const scrollToSection = (sectionId: string) => {
@@ -463,22 +462,22 @@ export function VitalsEntryModal({
     }
     if (finalData.bpDiastolic) {
       const dia = parseInt(finalData.bpDiastolic);
-      if (dia < 60) warnings.push(`Diastolic BP ${dia} is below normal (60-90)`);
-      if (dia > 90) warnings.push(`Diastolic BP ${dia} is above normal (60-90)`);
+      if (dia < 60) warnings.push(`Diastolic BP ${dia} is below normal (60-100)`);
+      if (dia > 100) warnings.push(`Diastolic BP ${dia} is above normal (60-100)`);
     }
 
-    // SpO2 validation (normal: ≥95%)
+    // SpO2 validation (normal: ≥94%)
     if (finalData.spo2 && !finalData.spo2NotAvailable) {
       const spo2 = parseInt(finalData.spo2);
-      if (spo2 < 95) warnings.push(`SpO2 ${spo2}% is below normal (≥95%)`);
+      if (spo2 < 94) warnings.push(`SpO2 ${spo2}% is below normal (≥94%)`);
     }
 
     // Temperature validation (normal: 97.0-99.5°F)
     if (finalData.temp && !finalData.tempNotAvailable) {
       const temp = parseFloat(finalData.temp);
       if (finalData.tempUnit === 'F') {
-        if (temp < 97) warnings.push(`Temperature ${temp}°F is below normal (97-99.5)`);
-        if (temp > 99.5) warnings.push(`Temperature ${temp}°F is above normal (97-99.5)`);
+        if (temp < 96.5) warnings.push(`Temperature ${temp}°F is below normal (96.5-100.4)`);
+        if (temp > 100.4) warnings.push(`Temperature ${temp}°F is above normal (96.5-100.4)`);
       }
     }
 
@@ -596,10 +595,7 @@ export function VitalsEntryModal({
             {/* NEUROLOGICAL SECTION (AVPU, GCS) */}
             {/* ============================================================ */}
             <section id="vitals-neuro" className="mb-8 scroll-mt-4">
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-slate-200 dark:border-slate-700 dark:text-white flex items-center gap-2">
-                <Brain className="h-5 w-5 text-purple-600" />
-                Neurological
-              </h3>
+
               
               {/* GCS Component */}
               <GCSInput
@@ -615,15 +611,14 @@ export function VitalsEntryModal({
             {/* CARDIOVASCULAR SECTION (Pulse, BP) */}
             {/* ============================================================ */}
             <section id="vitals-cardio" className="mb-8 scroll-mt-4">
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-slate-200 dark:border-slate-700 dark:text-white flex items-center gap-2">
-                <Heart className="h-5 w-5 text-red-600" />
-                Cardiovascular
-              </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Pulse/Heart Rate */}
                 <div className="space-y-4">
-                  <h4 className="font-medium text-slate-900 dark:text-white">Pulse / Heart Rate</h4>
+                  <h4 className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                    <Heart className="h-4 w-4 text-red-600" />
+                    Pulse / Heart Rate
+                    </h4>
                   <div className="space-y-2">
                     <Label className="dark:text-slate-300">BPM <span className="text-red-500">*</span></Label>
                     <Input
@@ -700,10 +695,6 @@ export function VitalsEntryModal({
             {/* RESPIRATORY SECTION (SpO2) */}
             {/* ============================================================ */}
             <section id="vitals-respiratory" className="mb-8 scroll-mt-4">
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-slate-200 dark:border-slate-700 dark:text-white flex items-center gap-2">
-                <Wind className="h-5 w-5 text-cyan-600" />
-                Respiratory
-              </h3>
               
               <div className="max-w-md space-y-4">
                 <div className="space-y-2">
@@ -729,7 +720,7 @@ export function VitalsEntryModal({
                     disabled={vitalData.spo2NotAvailable}
                     className="[&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <p className="text-xs text-slate-500">Normal range: 95-100%</p>
+                  <p className="text-xs text-slate-500">Normal range: 94-100%</p>
                 </div>
               </div>
             </section>

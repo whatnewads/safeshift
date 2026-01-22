@@ -667,15 +667,77 @@ export async function getDrafts(limit = 10): Promise<SavedDraftsResponse> {
   logEhrAttempt(null, 'GET_DRAFTS', { limit });
   
   try {
-    const response = await get<SavedDraftsResponse>(ENCOUNTER_ENDPOINTS.drafts, {
+    const response = await get<{
+      // Handle multiple possible response structures from backend
+      drafts?: Array<Record<string, unknown>>;
+      data?: Array<Record<string, unknown>>;
+      items?: Array<Record<string, unknown>>;
+      encounters?: Array<Record<string, unknown>>;
+      count?: number;
+      total?: number;
+    }>(ENCOUNTER_ENDPOINTS.drafts, {
       params: { limit }
     });
     
-    logEhrSuccess(null, 'GET_DRAFTS', { count: response.data.count });
+    // DEBUG: Log the full response structure to diagnose the issue
+    console.log('[getDrafts] Full API response:', JSON.stringify(response, null, 2));
+    
+    // The API response from backend wraps data in { success, status, data: {...} }
+    // response IS the full ApiResponse, so response.data contains the actual payload
+    // BUT if backend returns { data: { drafts: [...] } }, we need response.data
+    // If backend returns { drafts: [...] } directly, we need response itself
+    const rawData = response.data;
+    
+    console.log('[getDrafts] rawData (response.data):', JSON.stringify(rawData, null, 2));
+    console.log('[getDrafts] response.drafts:', response.drafts);
+    console.log('[getDrafts] rawData?.drafts:', rawData?.drafts);
+    
+    // Try multiple paths to find the drafts array:
+    // 1. response.data.drafts (standard structure)
+    // 2. response.drafts (if data is the response itself)
+    // 3. Various fallbacks for different API response formats
+    let draftsArray: Array<Record<string, unknown>> = [];
+    
+    if (rawData && typeof rawData === 'object') {
+      // Standard case: response.data contains { drafts, count }
+      draftsArray = (rawData as Record<string, unknown>).drafts as Array<Record<string, unknown>>
+        ?? (rawData as Record<string, unknown>).data as Array<Record<string, unknown>>
+        ?? (rawData as Record<string, unknown>).items as Array<Record<string, unknown>>
+        ?? (rawData as Record<string, unknown>).encounters as Array<Record<string, unknown>>
+        ?? [];
+    } else if (response && typeof response === 'object') {
+      // Fallback: try reading directly from response
+      draftsArray = (response as Record<string, unknown>).drafts as Array<Record<string, unknown>>
+        ?? (response as Record<string, unknown>).items as Array<Record<string, unknown>>
+        ?? (response as Record<string, unknown>).encounters as Array<Record<string, unknown>>
+        ?? [];
+    }
+    
+    console.log('[getDrafts] Extracted draftsArray:', draftsArray);
+    
+    // Ensure array
+    if (!Array.isArray(draftsArray)) {
+      draftsArray = [];
+    }
+    
+    // Transform to expected SavedDraft format with all required fields
+    const normalizedDrafts: SavedDraftsResponse['drafts'] = draftsArray.map((draft) => ({
+      encounter_id: String(draft.encounter_id ?? draft.id ?? ''),
+      patient_id: draft.patient_id != null ? String(draft.patient_id) : null,
+      patient_display_name: String(draft.patient_display_name ?? draft.patient_name ?? 'Unknown Patient'),
+      chief_complaint: draft.chief_complaint != null ? String(draft.chief_complaint) : null,
+      encounter_type: String(draft.encounter_type ?? draft.type ?? 'clinic'),
+      created_at: String(draft.created_at ?? new Date().toISOString()),
+      modified_at: String(draft.modified_at ?? draft.updated_at ?? draft.created_at ?? new Date().toISOString()),
+    }));
+    
+    const count = rawData.count ?? rawData.total ?? normalizedDrafts.length;
+    
+    logEhrSuccess(null, 'GET_DRAFTS', { count });
     
     return {
-      drafts: response.data.drafts || [],
-      count: response.data.count || 0,
+      drafts: normalizedDrafts,
+      count,
     };
   } catch (error) {
     logEhrError(null, 'GET_DRAFTS', error);

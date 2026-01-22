@@ -91,13 +91,40 @@ class PatientViewModel
             );
 
             // Get total count
-            $totalCount = $this->repository->count($search, $employerId, $active);
+            $totalCount = $this->repository->countWithFilters($search, $employerId, $active);
+
+            // Handle empty results gracefully - return success with empty array
+            if (empty($patients)) {
+                return ApiResponse::success([
+                    'patients' => [],
+                    'pagination' => [
+                        'page' => $page,
+                        'per_page' => $perPage,
+                        'total' => 0,
+                        'total_pages' => 0
+                    ],
+                    'filters' => [
+                        'search' => $search,
+                        'employer_id' => $employerId,
+                        'active' => $active,
+                        'sort_by' => $sortBy,
+                        'sort_order' => $sortOrder,
+                    ],
+                ]);
+            }
 
             // Convert to safe array format (minimal PHI for lists)
-            $patientData = array_map(
-                fn(Patient $p) => $this->formatPatientForList($p),
-                $patients
-            );
+            // Wrap in try-catch to handle individual patient hydration failures gracefully
+            $patientData = [];
+            foreach ($patients as $p) {
+                try {
+                    $patientData[] = $this->formatPatientForList($p);
+                } catch (\Exception $e) {
+                    // Log the error but continue processing other patients
+                    error_log("PatientViewModel::getPatients - Failed to format patient: " . $e->getMessage());
+                    continue;
+                }
+            }
 
             return ApiResponse::success([
                 'patients' => $patientData,

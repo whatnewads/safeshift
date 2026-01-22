@@ -107,12 +107,24 @@ class PatientRepository implements RepositoryInterface
         $conditions = [];
         $params = [];
         
-        // Default to active patients if not specified in criteria
-        if (!array_key_exists('active_status', $criteria)) {
-            $conditions[] = 'active_status = 1';
+        // Default to active patients (deleted_at IS NULL) if not specified in criteria
+        // The patients table uses soft delete pattern with deleted_at column
+        if (!array_key_exists('active_status', $criteria) && !array_key_exists('is_active', $criteria) && !array_key_exists('deleted_at', $criteria)) {
+            $conditions[] = 'deleted_at IS NULL';
         }
         
         foreach ($criteria as $field => $value) {
+            // Map active_status/is_active to deleted_at check
+            if ($field === 'active_status' || $field === 'is_active') {
+                // Active = deleted_at IS NULL, Inactive = deleted_at IS NOT NULL
+                if ($value) {
+                    $conditions[] = 'deleted_at IS NULL';
+                } else {
+                    $conditions[] = 'deleted_at IS NOT NULL';
+                }
+                continue;
+            }
+            
             if ($value === null) {
                 $conditions[] = "{$field} IS NULL";
             } elseif (is_bool($value)) {
@@ -184,10 +196,13 @@ class PatientRepository implements RepositoryInterface
         $conditions = [];
         $params = [];
 
-        // Active status filter
+        // Active status filter (using soft delete pattern with deleted_at column)
         if ($active !== null) {
-            $conditions[] = 'active_status = :active';
-            $params['active'] = $active ? 1 : 0;
+            if ($active) {
+                $conditions[] = 'deleted_at IS NULL';
+            } else {
+                $conditions[] = 'deleted_at IS NOT NULL';
+            }
         }
 
         // Employer filter
@@ -197,14 +212,14 @@ class PatientRepository implements RepositoryInterface
         }
 
         // Search query (name, MRN, SSN last four)
+        // Use actual DB column names: legal_first_name, legal_last_name
         if ($query !== null && $query !== '') {
             $searchTerm = '%' . $query . '%';
             $conditions[] = '(
-                first_name LIKE :search_term 
-                OR last_name LIKE :search_term 
-                OR CONCAT(first_name, " ", last_name) LIKE :search_term
-                OR mrn LIKE :search_term 
-                OR ssn_last_four LIKE :search_term
+                legal_first_name LIKE :search_term
+                OR legal_last_name LIKE :search_term
+                OR CONCAT(legal_first_name, " ", legal_last_name) LIKE :search_term
+                OR preferred_name LIKE :search_term
                 OR email LIKE :search_term
             )';
             $params['search_term'] = $searchTerm;
@@ -212,9 +227,16 @@ class PatientRepository implements RepositoryInterface
 
         $whereClause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
         
-        // Validate sort column
-        $validSortColumns = ['last_name', 'first_name', 'date_of_birth', 'created_at', 'mrn'];
-        $sortBy = in_array($sortBy, $validSortColumns) ? $sortBy : 'last_name';
+        // Validate sort column - map to actual DB column names
+        $sortColumnMap = [
+            'last_name' => 'legal_last_name',
+            'first_name' => 'legal_first_name',
+            'date_of_birth' => 'dob',
+            'created_at' => 'created_at',
+            'mrn' => 'patient_id'  // No MRN column, use patient_id instead
+        ];
+        $validSortColumns = array_keys($sortColumnMap);
+        $sortBy = in_array($sortBy, $validSortColumns) ? $sortColumnMap[$sortBy] : 'legal_last_name';
         $sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
 
         $sql = "SELECT * FROM {$this->table} 
@@ -284,9 +306,13 @@ class PatientRepository implements RepositoryInterface
         $conditions = [];
         $params = [];
 
+        // Active status filter using soft delete pattern
         if ($active !== null) {
-            $conditions[] = 'active_status = :active';
-            $params['active'] = $active ? 1 : 0;
+            if ($active) {
+                $conditions[] = 'deleted_at IS NULL';
+            } else {
+                $conditions[] = 'deleted_at IS NOT NULL';
+            }
         }
 
         if ($employerId !== null) {
@@ -294,14 +320,15 @@ class PatientRepository implements RepositoryInterface
             $params['employer_id'] = $employerId;
         }
 
+        // Use actual DB column names: legal_first_name, legal_last_name
         if ($query !== null && $query !== '') {
             $searchTerm = '%' . $query . '%';
             $conditions[] = '(
-                first_name LIKE :search_term
-                OR last_name LIKE :search_term
-                OR CONCAT(first_name, " ", last_name) LIKE :search_term
-                OR mrn LIKE :search_term
-                OR ssn_last_four LIKE :search_term
+                legal_first_name LIKE :search_term
+                OR legal_last_name LIKE :search_term
+                OR CONCAT(legal_first_name, " ", legal_last_name) LIKE :search_term
+                OR preferred_name LIKE :search_term
+                OR email LIKE :search_term
             )';
             $params['search_term'] = $searchTerm;
         }
@@ -332,9 +359,9 @@ class PatientRepository implements RepositoryInterface
      */
     public function findByClinic(string $clinicId, int $limit = 100, int $offset = 0): array
     {
-        $sql = "SELECT * FROM {$this->table} 
-                WHERE clinic_id = :clinic_id AND active_status = 1
-                ORDER BY last_name, first_name 
+        $sql = "SELECT * FROM {$this->table}
+                WHERE clinic_id = :clinic_id AND deleted_at IS NULL
+                ORDER BY legal_last_name, legal_first_name
                 LIMIT :limit OFFSET :offset";
         
         $stmt = $this->pdo->prepare($sql);
@@ -410,22 +437,28 @@ class PatientRepository implements RepositoryInterface
             'address_line_1', 'address_line_2', 'city', 'state', 'zip_code', 'country',
             'employer_id', 'employer_name', 'clinic_id',
             'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
-            'insurance_info', 'active_status'
+            'insurance_info', 'is_active'
         ];
         $setClauses = [];
         $params = ['patient_id' => $id];
 
         foreach ($allowedFields as $field) {
-            if (array_key_exists($field, $data)) {
-                if ($field === 'insurance_info' && is_array($data[$field])) {
+            // Check for both is_active and active_status in input data
+            $dataKey = $field;
+            if ($field === 'is_active' && !array_key_exists('is_active', $data) && array_key_exists('active_status', $data)) {
+                $dataKey = 'active_status';
+            }
+            
+            if (array_key_exists($dataKey, $data)) {
+                if ($field === 'insurance_info' && is_array($data[$dataKey])) {
                     $setClauses[] = "{$field} = :{$field}";
-                    $params[$field] = json_encode($data[$field]);
-                } elseif ($field === 'active_status') {
+                    $params[$field] = json_encode($data[$dataKey]);
+                } elseif ($field === 'is_active') {
                     $setClauses[] = "{$field} = :{$field}";
-                    $params[$field] = $data[$field] ? 1 : 0;
+                    $params[$field] = $data[$dataKey] ? 1 : 0;
                 } else {
                     $setClauses[] = "{$field} = :{$field}";
-                    $params[$field] = $data[$field];
+                    $params[$field] = $data[$dataKey];
                 }
             }
         }
@@ -583,7 +616,7 @@ class PatientRepository implements RepositoryInterface
                     primary_phone, secondary_phone, address_line_1, address_line_2,
                     city, state, zip_code, country, employer_id, employer_name,
                     clinic_id, emergency_contact_name, emergency_contact_phone,
-                    emergency_contact_relation, insurance_info, active_status,
+                    emergency_contact_relation, insurance_info, is_active,
                     created_at, updated_at
                 ) VALUES (
                     :patient_id, :first_name, :last_name, :middle_name, :date_of_birth,
@@ -591,7 +624,7 @@ class PatientRepository implements RepositoryInterface
                     :primary_phone, :secondary_phone, :address_line_1, :address_line_2,
                     :city, :state, :zip_code, :country, :employer_id, :employer_name,
                     :clinic_id, :emergency_contact_name, :emergency_contact_phone,
-                    :emergency_contact_relation, :insurance_info, :active_status,
+                    :emergency_contact_relation, :insurance_info, :is_active,
                     NOW(), NOW()
                 )";
 
@@ -625,7 +658,7 @@ class PatientRepository implements RepositoryInterface
             'emergency_contact_phone' => $patient->toArray()['emergency_contact_phone'] ?? null,
             'emergency_contact_relation' => $patient->toArray()['emergency_contact_relation'] ?? null,
             'insurance_info' => json_encode($patient->getInsuranceInfo()),
-            'active_status' => $patient->isActive() ? 1 : 0,
+            'is_active' => $patient->isActive() ? 1 : 0,
         ]);
 
         if ($success) {
@@ -667,7 +700,7 @@ class PatientRepository implements RepositoryInterface
                     emergency_contact_phone = :emergency_contact_phone,
                     emergency_contact_relation = :emergency_contact_relation,
                     insurance_info = :insurance_info,
-                    active_status = :active_status,
+                    is_active = :is_active,
                     updated_at = NOW()
                 WHERE patient_id = :patient_id";
 
@@ -701,17 +734,18 @@ class PatientRepository implements RepositoryInterface
             'emergency_contact_phone' => $data['emergency_contact_phone'] ?? null,
             'emergency_contact_relation' => $data['emergency_contact_relation'] ?? null,
             'insurance_info' => json_encode($patient->getInsuranceInfo()),
-            'active_status' => $patient->isActive() ? 1 : 0,
+            'is_active' => $patient->isActive() ? 1 : 0,
         ]);
     }
 
     /**
      * Soft delete a patient (deactivate)
+     * Uses deleted_at column for soft delete pattern
      */
     public function delete(string $id): bool
     {
-        $sql = "UPDATE {$this->table} 
-                SET active_status = 0, updated_at = NOW()
+        $sql = "UPDATE {$this->table}
+                SET deleted_at = NOW(), modified_at = NOW()
                 WHERE patient_id = :id";
         
         $stmt = $this->pdo->prepare($sql);
@@ -730,12 +764,12 @@ class PatientRepository implements RepositoryInterface
     }
 
     /**
-     * Activate a patient
+     * Activate a patient (restore from soft delete)
      */
     public function activate(string $id): bool
     {
-        $sql = "UPDATE {$this->table} 
-                SET active_status = 1, updated_at = NOW()
+        $sql = "UPDATE {$this->table}
+                SET deleted_at = NULL, modified_at = NOW()
                 WHERE patient_id = :id";
         
         $stmt = $this->pdo->prepare($sql);
@@ -748,9 +782,9 @@ class PatientRepository implements RepositoryInterface
      */
     public function getRecentPatients(int $days = 7, int $limit = 50): array
     {
-        $sql = "SELECT * FROM {$this->table} 
+        $sql = "SELECT * FROM {$this->table}
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
-                AND active_status = 1
+                AND deleted_at IS NULL
                 ORDER BY created_at DESC
                 LIMIT :limit";
         
@@ -802,6 +836,11 @@ class PatientRepository implements RepositoryInterface
             $dateOfBirth = $row['date_of_birth'];
         }
         
+        // Handle null date of birth gracefully to prevent crashes
+        if ($dateOfBirth === null) {
+            $dateOfBirth = '1900-01-01'; // Sentinel value for unknown DOB
+        }
+        
         $gender = 'U';
         if (array_key_exists('sex_assigned_at_birth', $row) && $row['sex_assigned_at_birth'] !== null) {
             $gender = $row['sex_assigned_at_birth'];
@@ -832,9 +871,12 @@ class PatientRepository implements RepositoryInterface
             'emergency_contact_name' => $row['emergency_contact_name'] ?? null,
             'emergency_contact_phone' => $row['emergency_contact_phone'] ?? null,
             'emergency_contact_relation' => $row['emergency_contact_relation'] ?? null,
-            'active_status' => $row['active_status'] ?? 1,
+            // Active status: deleted_at IS NULL means active (1), otherwise inactive (0)
+            'active_status' => (array_key_exists('deleted_at', $row) && $row['deleted_at'] === null) ? 1 :
+                               (array_key_exists('deleted_at', $row) ? 0 :
+                               ($row['is_active'] ?? $row['active_status'] ?? 1)),
             'created_at' => $row['created_at'] ?? null,
-            'updated_at' => $row['updated_at'] ?? null,
+            'updated_at' => $row['updated_at'] ?? $row['modified_at'] ?? null,
         ];
 
         // Handle SSN
